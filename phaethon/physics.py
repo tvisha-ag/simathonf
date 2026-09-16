@@ -1,4 +1,4 @@
-# Approximations: Central Newtonian gravity with weak-field 1PN Schwarzschild perihelion precession correction term and N-body gravitational perturbation from a massive stellar intruder. Collisionless test-particle ring model.
+# Approximations: Central Newtonian gravity with weak-field 1PN Schwarzschild perihelion precession correction term and N-body gravitational perturbation from a massive stellar intruder. Collisionless test-particle ring model around a stellar-mass black hole (100 M_sun).
 
 """
 Phaethon Astrophysics Engine: Collisionless Tidal Ring & Relativistic Disruption
@@ -15,7 +15,7 @@ G_CONST = 4.0 * (np.pi ** 2)
 C_LIGHT = 63239.7
 
 class CentralBlackHole:
-    """Central non-rotating Schwarzschild Black Hole."""
+    """Central non-rotating Schwarzschild Stellar-Mass Black Hole (100 M_sun)."""
     def __init__(self, mass: float = 100.0, radius: float = 0.5):
         self.mass = mass
         self.radius = radius
@@ -24,13 +24,13 @@ class CentralBlackHole:
 
 
 class StellarIntruder:
-    """Massive stellar intruder following an eccentric, inclined Keplerian orbit."""
+    """Massive stellar intruder (25 M_sun) following an eccentric, inclined Keplerian orbit."""
     def __init__(
         self,
-        mass: float = 15.0,
-        pericenter: float = 4.0,
+        mass: float = 25.0,
+        pericenter: float = 3.5,
         eccentricity: float = 0.85,
-        inclination_deg: float = 25.0,
+        inclination_deg: float = 22.0,
         central_mass: float = 100.0
     ):
         self.mass = mass
@@ -53,13 +53,11 @@ class StellarIntruder:
         r_apo = self.a * (1.0 + self.eccentricity)
         v_apo = np.sqrt(G_CONST * (self.central_mass + self.mass) * (2.0 / r_apo - 1.0 / self.a))
         
-        # Un-inclined coordinates at apocenter (along +X, moving in +Y)
         x0 = r_apo
         y0 = 0.0
         vx0 = 0.0
         vy0 = -v_apo
         
-        # Rotate by inclination around X axis
         cos_i = np.cos(self.inclination)
         sin_i = np.sin(self.inclination)
         
@@ -74,15 +72,15 @@ class StellarIntruder:
 
 class CollisionlessTidalRing:
     """
-    Pristine, multi-band ring of collisionless icy test particles
-    orbiting a central black hole, perturbed by a massive stellar intruder.
+    Pristine, multi-band thin ring of collisionless icy test particles
+    orbiting a stellar-mass black hole, perturbed by a massive stellar intruder.
     """
     def __init__(
         self,
         num_particles: int = 5000,
-        r_inner: float = 6.0,
-        r_outer: float = 14.0,
-        thickness: float = 0.15,
+        r_inner: float = 5.5,
+        r_outer: float = 13.5,
+        thickness: float = 0.05,
         central_mass: float = 100.0,
         seed: int = 42
     ):
@@ -102,16 +100,19 @@ class CollisionlessTidalRing:
         self._generate_ring()
 
     def _generate_ring(self):
-        # Generate multi-band radial density distribution
+        # Generate multi-band radial density distribution with thin vertical dispersion
         u = self.rng.uniform(0.0, 1.0, self.N)
         radii = self.r_inner + (self.r_outer - self.r_inner) * np.sqrt(u)
         
-        # Add subtle ringlet gap variations
-        ringlet_mask = (radii > 9.0) & (radii < 9.6)
-        radii[ringlet_mask] += self.rng.uniform(-0.4, 0.4, np.sum(ringlet_mask))
-        
+        # Add 2-3 radial ringlet gaps
+        mask1 = (radii > 7.5) & (radii < 8.2)
+        radii[mask1] += self.rng.choice([-0.7, 0.7], size=np.sum(mask1))
+
+        mask2 = (radii > 10.2) & (radii < 10.8)
+        radii[mask2] += self.rng.choice([-0.6, 0.6], size=np.sum(mask2))
+
         angles = self.rng.uniform(0.0, 2.0 * np.pi, self.N)
-        z_offsets = self.rng.normal(0.0, self.thickness, self.N)
+        z_offsets = self.rng.uniform(-self.thickness, self.thickness, self.N)
 
         self.positions[:, 0] = radii * np.cos(angles)
         self.positions[:, 1] = radii * np.sin(angles)
@@ -130,7 +131,7 @@ class CollisionlessTidalRing:
 class SymplecticRingIntegrator:
     """
     Second-Order Symplectic Velocity Verlet integrator for test-particle ring
-    under central black hole and moving stellar intruder gravity.
+    under central stellar-mass black hole and moving stellar intruder gravity.
     """
     def __init__(
         self,
@@ -170,19 +171,18 @@ class SymplecticRingIntegrator:
         acc = - (G_CONST * self.bh.mass / (r_clamped ** 3)) * pos
 
         # 2. Stellar Intruder Gravity (Softened)
-        diff_int = pos - pos_intruder  # (N, 3)
+        diff_int = pos - pos_intruder
         dist_int_sq = np.sum(diff_int ** 2, axis=1, keepdims=True) + (self.softening ** 2)
         dist_int_cube = dist_int_sq ** 1.5
         acc_int = - (G_CONST * self.intruder.mass / dist_int_cube) * diff_int
         acc += acc_int
 
-        # Track tidal acceleration magnitude near intruder
         self.ring.tidal_accelerations = np.linalg.norm(acc_int, axis=1)
 
         # 3. Weak-Field 1PN General Relativistic Schwarzschild Precession (Optional)
         if self.enable_gr:
-            L_vecs = np.cross(pos, vel)  # (N, 3)
-            L_sq = np.sum(L_vecs ** 2, axis=1, keepdims=True)  # (N, 1)
+            L_vecs = np.cross(pos, vel)
+            L_sq = np.sum(L_vecs ** 2, axis=1, keepdims=True)
             c_effective = self.c_scale
             acc_1pn = - (3.0 * G_CONST * self.bh.mass * L_sq / ((c_effective ** 2) * (r_clamped ** 5))) * pos
             acc += acc_1pn
@@ -214,13 +214,10 @@ class SymplecticRingIntegrator:
         self._update_telemetry()
 
     def _update_telemetry(self):
-        # Compute specific orbital energy E = 0.5 * v^2 - G * M_BH / r
         pos = self.ring.positions
         vel = self.ring.velocities
         r_norms = np.linalg.norm(pos, axis=1)
         current_energies = 0.5 * np.sum(vel ** 2, axis=1) - G_CONST * self.bh.mass / r_norms
-        
-        # Energy perturbation ratio |E - E0| / |E0|
         self.ring.energy_perturbations = np.abs(current_energies - self.ring.initial_energies) / np.abs(self.ring.initial_energies)
 
     def get_telemetry(self) -> dict:

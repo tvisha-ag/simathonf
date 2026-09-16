@@ -14,8 +14,8 @@ class SimulationApp:
     def __init__(
         self,
         num_particles: int = 5000,
-        r_inner: float = 6.0,
-        r_outer: float = 14.0,
+        r_inner: float = 5.5,
+        r_outer: float = 13.5,
         dt: float = 0.002,
         enable_gr: bool = True
     ):
@@ -40,17 +40,17 @@ class SimulationApp:
         """Reset physics simulation state to initial pristine ring + intruder at apocenter."""
         self.bh = CentralBlackHole(mass=100.0, radius=0.5)
         self.intruder = StellarIntruder(
-            mass=15.0,
-            pericenter=4.0,
+            mass=25.0,
+            pericenter=3.5,
             eccentricity=0.85,
-            inclination_deg=25.0,
+            inclination_deg=22.0,
             central_mass=100.0
         )
         self.ring = CollisionlessTidalRing(
             num_particles=self.num_particles,
             r_inner=self.r_inner,
             r_outer=self.r_outer,
-            thickness=0.15,
+            thickness=0.05,
             central_mass=100.0,
             seed=42
         )

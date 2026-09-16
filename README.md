@@ -1,5 +1,5 @@
 # Phaethon: Relativistic Tidal Ring Disruption & Spacetime Engine
-**Simathon Competition Edition — NASA/JPL Observatory Overhaul**
+**Simathon Competition Edition — NASA/JPL Observatory Refinement**
 
 [![Physics Tests](https://img.shields.io/badge/Physics_Suite-9%2F9_Passed-00f0ff.svg)](#verification-suite)
 [![License](https://img.shields.io/badge/License-MIT-gold.svg)](#license)
@@ -10,9 +10,9 @@
 
 **Phaethon** is an interactive, physically defensible WebGL and Python astrophysics simulation built for scientific visualization and creative coding competitions.
 
-Designed as a **NASA/JPL Mission-Control Computational Observatory**, the simulation models the **tidal disruption of a pristine icy particle ring** orbiting a supermassive Central Black Hole ($M_{\text{BH}} = 100\,M_\odot$) when perturbed by an eccentric, inclined Stellar Intruder ($M_{\text{star}} = 15\,M_\odot$).
+Designed as a **NASA/JPL Mission-Control Computational Observatory**, the simulation models the **tidal disruption of a thin icy particle ring** ($r_{\text{in}} = 5.5\,\text{AU}$, $r_{\text{out}} = 13.5\,\text{AU}$, vertical dispersion $\sigma_z = 0.05\,\text{AU}$) orbiting a Stellar-Mass Central Black Hole ($M_{\text{BH}} = 100\,M_\odot$) when perturbed by an eccentric, inclined Stellar Intruder ($M_{\text{star}} = 25\,M_\odot$).
 
-Unlike generic particle systems or simplified sphere animations, Phaethon calculates differential gravitational forces across $5,000\text{--}20,000$ collisionless test particles using a 2nd-order **Symplectic Velocity Verlet** numerical integrator with optional **1PN Schwarzschild Post-Newtonian relativistic precession** and a live **3D Tidal Distortion Field** vector overlay.
+Phaethon calculates differential gravitational forces across $5,000\text{--}20,000$ collisionless test particles using a 2nd-order **Symplectic Velocity Verlet** numerical integrator with optional **1PN Schwarzschild Post-Newtonian relativistic precession**, a live **Reference Orbit Overlay (`V` key)**, and a **3D Tidal Distortion Field** vector overlay.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -24,41 +24,35 @@ Unlike generic particle systems or simplified sphere animations, Phaethon calcul
 
 ---
 
-## 2. Key Scientific Features
+## 2. Key Refined Observatory Features
 
-### A. NASA/JPL Mission-Control Aesthetic
-- **Top Bar**: Displays `PHAETHON // TIDAL RING OBSERVATORY`, real-time 5-stage encounter timeline, and live simulation status badges (`ACTIVE` / `PAUSED`).
-- **Sidebar Telemetry**: Clean dark slate HUD (`rgba(4, 9, 18, 0.9)`) displaying physical constants ($M_{\text{BH}}$, $M_{\text{star}}$), orbital separation ($\text{AU}$), maximum tidal acceleration, perturbed particle gauge, and live Hamiltonian energy drift plot canvas.
+### A. Thin Disk Ring with 2-3 Radial Ringlets
+- Particles are initialized in a thin, disk-like orbital ring with small vertical dispersion ($\sigma_z = 0.05\,\text{AU}$) and 2-3 clearly visible radial ringlet gaps ($r \approx 7.8\,\text{AU}$ and $r \approx 10.5\,\text{AU}$) preserving circular Keplerian velocities ($v_c = \sqrt{G M / r}$).
 
-### B. 3D Tidal Distortion Field Vector Overlay (`T` Key / Toggle)
-- Toggling `TIDAL FIELD: ON` renders a dynamic sparse 3D vector field display showing differential gravitational acceleration arrows $\Delta \mathbf{a}_{\text{tidal}} = \mathbf{a}_{\text{star}} - \mathbf{a}_{\text{BH-COM}}$, visually demonstrating *why* differential forces pull the ring apart.
+### B. Reference Orbit Comparison Mode (`V` Key / Toggle)
+- Toggling `REFERENCE: ON` (`V` key or button) displays thin, elegant unperturbed reference outline loops representing the initial ring boundaries ($r = 5.5, 8.5, 11.0, 13.5\,\text{AU}$), allowing immediate comparison between perturbed particles and pristine orbits.
 
-### C. 5-Stage Encounter Progress Bar
-1. **`01 — ORDERED RING`**: Pristine circular Keplerian orbit ($v_c = \sqrt{G M / r}$).
-2. **`02 — INTRUDER APPROACH`**: Stellar intruder approaching ring plane along eccentric trajectory.
-3. **`03 — CLOSE ENCOUNTER`**: Pericenter passage ($r \le 10\,\text{AU}$).
-4. **`04 — TIDAL RESPONSE`**: Asymmetric gravitational stretching of ring particles into density waves.
-5. **`05 — DEBRIS EVOLUTION`**: Long-term tidal stream formation and high-energy debris escape.
+### C. 3D Tidal Distortion Field Vector Overlay (`T` Key / Toggle)
+- Toggling `TIDAL FIELD: ON` renders dynamic sparse 3D differential acceleration vectors $\Delta \mathbf{a}_{\text{tidal}} = \mathbf{a}_{\text{star}} - \mathbf{a}_{\text{BH-COM}}$ around the intruder, visually demonstrating *why* differential gravitational forces stretch the ring.
+
+### D. Scientifically Accurate Classification
+- Central mass $M_{\text{BH}} = 100\,M_\odot$ is correctly classified as a **Stellar-Mass Black Hole System**.
+- Energy plot is accurately labeled as **Test-Particle Energy Perturbation ($\Delta E / E_0$)**.
 
 ---
 
 ## 3. Physical Model & Equations
 
 ### Unit System & Constants
-The simulation operates in standard astronomical units:
 - **Length**: Astronomical Units ($\text{AU}$)
 - **Mass**: Solar Masses ($M_\odot$)
 - **Time**: Years ($\text{yr}$)
-
-In this unit system, the gravitational constant is:
-$$G = 4\pi^2 \approx 39.47841760435743\;\text{AU}^3\,M_\odot^{-1}\,\text{yr}^{-2}$$
+- **Gravitational Constant**: $G = 4\pi^2 \approx 39.47841760435743\;\text{AU}^3\,M_\odot^{-1}\,\text{yr}^{-2}$
 
 ### Gravitational Acceleration
-For each ring test particle $i$ with position $\mathbf{r}_i$ and velocity $\mathbf{v}_i$:
-
 $$\mathbf{a}_i = -\frac{G M_{\text{BH}} \mathbf{r}_i}{|\mathbf{r}_i|^3} - \frac{G M_{\text{star}} (\mathbf{r}_i - \mathbf{r}_{\text{star}})}{\left(|\mathbf{r}_i - \mathbf{r}_{\text{star}}|^2 + \epsilon^2\right)^{3/2}} + \mathbf{a}_{\text{1PN}}$$
 
-where $M_{\text{BH}} = 100\,M_\odot$, $M_{\text{star}} = 15\,M_\odot$, and $\epsilon = 0.15\;\text{AU}$ (Plummer softening).
+where $M_{\text{BH}} = 100\,M_\odot$, $M_{\text{star}} = 25\,M_\odot$, and $\epsilon = 0.15\;\text{AU}$ (Plummer softening).
 
 ### Weak-Field 1PN Relativistic Precession (`RELATIVITY: ON/OFF`)
 $$\mathbf{a}_{\text{1PN}} = -\frac{3 G M_{\text{BH}} L_i^2}{c_{\text{eff}}^2 r_i^5} \mathbf{r}_i \quad \text{where } \mathbf{L}_i = \mathbf{r}_i \times \mathbf{v}_i$$
@@ -104,6 +98,7 @@ python -m pytest -v tests/
 |---|---|
 | **`SPACE`** | Pause / Resume simulation |
 | **`R`** | Reset ring & intruder to initial state |
+| **`V`** | Toggle Reference Orbit Outline Loops |
 | **`T`** | Toggle 3D Tidal Distortion Vector Field |
 | **`G`** | Toggle 1PN Relativistic Schwarzschild Precession |
 | **`W`** / **`UP`** | Increase simulation speed ($+0.5\times$) |
@@ -130,7 +125,7 @@ tests/test_simulation.py::test_star_catalog_temperature_and_rgb PASSED   [ 77%]
 tests/test_simulation.py::test_simulation_app_lifecycle PASSED           [ 88%]
 tests/test_simulation.py::test_stellar_intruder_trajectory PASSED        [100%]
 
-============================== 9 passed in 1.73s ==============================
+============================== 9 passed in 1.77s ==============================
 ```
 
 ---
