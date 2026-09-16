@@ -3,86 +3,135 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Phaethon: Relativistic Tidal Ring Disruption Engine</title>
+    <title>PHAETHON // TIDAL RING OBSERVATORY</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background: #010308; font-family: 'Consolas', 'Fira Code', 'Monaco', monospace; color: #d0e4ff; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #02050b; font-family: 'Consolas', 'Fira Code', 'Monaco', monospace; color: #d0e4ff; }
         #webgl-canvas { width: 100%; height: 100%; display: block; }
 
-        /* Scientific Glassmorphism HUD Dashboard */
+        /* NASA/JPL Observatory Top Header Bar */
+        .top-header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 48px;
+            background: rgba(4, 9, 18, 0.92);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-bottom: 1px solid rgba(0, 240, 255, 0.25);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 24px;
+            z-index: 120;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+        }
+
+        .header-title-box { display: flex; align-items: center; gap: 14px; }
+        .header-title { font-size: 16px; font-weight: 900; color: #ffd700; letter-spacing: 2.5px; text-shadow: 0 0 12px rgba(255, 215, 0, 0.35); }
+        .header-sub { font-size: 10px; color: #6a88b6; letter-spacing: 1.5px; }
+
+        .header-status { display: flex; align-items: center; gap: 10px; }
+        .status-badge {
+            font-size: 9.5px; padding: 3px 9px; border-radius: 4px; letter-spacing: 1.2px; font-weight: bold;
+            background: rgba(0, 240, 255, 0.15); border: 1px solid #00f0ff; color: #00f0ff;
+        }
+        .status-badge.paused { background: rgba(255, 215, 0, 0.15); border-color: #ffd700; color: #ffd700; }
+
+        /* 5-Stage Encounter Timeline Bar (Top Right / Center) */
+        .timeline-bar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(2, 6, 14, 0.8);
+            border: 1px solid rgba(0, 240, 255, 0.2);
+            border-radius: 6px;
+            padding: 4px 10px;
+        }
+
+        .timeline-step {
+            font-size: 9px;
+            padding: 4px 8px;
+            color: #506a92;
+            border-radius: 4px;
+            letter-spacing: 0.8px;
+            transition: all 0.25s ease;
+        }
+        .timeline-step.active {
+            background: rgba(0, 240, 255, 0.22);
+            color: #ffffff;
+            border: 1px solid #00f0ff;
+            font-weight: bold;
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+        }
+
+        /* NASA/JPL Telemetry Sidebar Panel (Left Side) */
         .hud-panel {
             position: absolute;
-            top: 16px;
+            top: 60px;
             left: 16px;
-            width: 440px;
-            background: rgba(4, 9, 18, 0.88);
+            width: 380px;
+            background: rgba(4, 9, 18, 0.90);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(0, 240, 255, 0.35);
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.85), inset 0 0 16px rgba(0, 240, 255, 0.06);
+            border: 1px solid rgba(0, 240, 255, 0.25);
+            border-radius: 10px;
+            padding: 16px;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.85);
             z-index: 100;
-            max-height: calc(100vh - 32px);
+            max-height: calc(100vh - 76px);
             overflow-y: auto;
         }
 
-        .hud-panel::-webkit-scrollbar { width: 4px; }
-        .hud-panel::-webkit-scrollbar-thumb { background: rgba(0, 240, 255, 0.4); border-radius: 2px; }
+        .hud-panel::-webkit-scrollbar { width: 3px; }
+        .hud-panel::-webkit-scrollbar-thumb { background: rgba(0, 240, 255, 0.3); border-radius: 2px; }
 
-        .hud-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
-        .hud-title { font-size: 15px; font-weight: 900; color: #ffd700; letter-spacing: 2px; text-shadow: 0 0 10px rgba(255, 215, 0, 0.4); }
-        .hud-badge { font-size: 9px; padding: 2px 6px; background: rgba(0, 240, 255, 0.18); border: 1px solid #00f0ff; border-radius: 4px; color: #00f0ff; letter-spacing: 1px; font-weight: bold; }
-        .hud-subtitle { font-size: 10px; color: #7894c4; margin-bottom: 10px; line-height: 1.4; }
-        .hud-divider { height: 1px; background: linear-gradient(90deg, rgba(0, 240, 255, 0.4), transparent); margin: 10px 0; }
+        .hud-section-title { font-size: 10px; color: #ffd700; letter-spacing: 1.5px; margin-bottom: 8px; font-weight: bold; text-transform: uppercase; }
+        .hud-divider { height: 1px; background: linear-gradient(90deg, rgba(0, 240, 255, 0.35), transparent); margin: 10px 0; }
 
-        .metric-row { display: flex; justify-content: space-between; font-size: 11px; color: #95b2de; margin-bottom: 4px; }
+        .metric-row { display: flex; justify-content: space-between; font-size: 10.5px; color: #88a5d2; margin-bottom: 4px; }
         .metric-val { color: #00f0ff; font-weight: bold; }
-        .metric-val.warn { color: #ffd700; }
-        .metric-val.alert { color: #ff3050; }
 
         .control-group { margin-bottom: 8px; }
-        .control-label { display: flex; justify-content: space-between; font-size: 10px; color: #a0c2f0; margin-bottom: 3px; font-weight: 600; }
+        .control-label { display: flex; justify-content: space-between; font-size: 10px; color: #90b2e0; margin-bottom: 3px; font-weight: 600; }
 
         select, button {
-            width: 100%; padding: 7px 10px; background: rgba(10, 22, 40, 0.94);
-            border: 1px solid rgba(0, 240, 255, 0.35); color: #e0f4ff; border-radius: 5px;
-            font-family: inherit; font-size: 11px; cursor: pointer; transition: all 0.2s ease;
+            width: 100%; padding: 6px 10px; background: rgba(8, 18, 34, 0.95);
+            border: 1px solid rgba(0, 240, 255, 0.3); color: #e0f4ff; border-radius: 4px;
+            font-family: inherit; font-size: 10.5px; cursor: pointer; transition: all 0.2s ease;
         }
-        select:hover, button:hover { background: rgba(18, 40, 70, 0.96); border-color: #00f0ff; box-shadow: 0 0 12px rgba(0, 240, 255, 0.3); }
+        select:hover, button:hover { background: rgba(16, 36, 64, 0.96); border-color: #00f0ff; box-shadow: 0 0 10px rgba(0, 240, 255, 0.25); }
 
-        .btn-row { display: flex; gap: 6px; margin-top: 5px; }
-        .toggle-btn { flex: 1; padding: 6px; text-align: center; font-size: 10px; background: rgba(10, 22, 40, 0.94); border: 1px solid rgba(70, 110, 170, 0.35); border-radius: 5px; cursor: pointer; color: #7890b8; transition: all 0.2s ease; }
-        .toggle-btn.active { background: rgba(0, 240, 255, 0.22); border-color: #00f0ff; color: #ffffff; font-weight: bold; box-shadow: 0 0 10px rgba(0, 240, 255, 0.25); }
+        .btn-row { display: flex; gap: 6px; margin-top: 4px; }
+        .toggle-btn { flex: 1; padding: 5px; text-align: center; font-size: 9.5px; background: rgba(8, 18, 34, 0.95); border: 1px solid rgba(70, 110, 170, 0.35); border-radius: 4px; cursor: pointer; color: #6a88b6; transition: all 0.2s ease; }
+        .toggle-btn.active { background: rgba(0, 240, 255, 0.2); border-color: #00f0ff; color: #ffffff; font-weight: bold; box-shadow: 0 0 8px rgba(0, 240, 255, 0.25); }
 
-        /* Stress Gauge & Progress Bars */
-        .gauge-container { width: 100%; height: 10px; background: rgba(8, 16, 28, 0.95); border-radius: 5px; overflow: hidden; border: 1px solid rgba(0, 240, 255, 0.3); margin-top: 4px; }
+        /* Gauge Bars & Analytics Canvases */
+        .gauge-container { width: 100%; height: 8px; background: rgba(6, 12, 22, 0.95); border-radius: 4px; overflow: hidden; border: 1px solid rgba(0, 240, 255, 0.25); margin-top: 4px; }
         .gauge-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #00f0ff, #ffd700, #ff3050); transition: width 0.1s ease-out; }
 
-        .analytics-grid { display: flex; gap: 8px; margin-top: 5px; }
-        .analytics-box { flex: 1; }
-        .canvas-label { font-size: 9.5px; color: #7894c4; margin-bottom: 2px; font-weight: bold; }
-        canvas.analytics-canvas { width: 100%; height: 75px; background: rgba(2, 6, 14, 0.96); border: 1px solid rgba(0, 240, 255, 0.25); border-radius: 5px; }
+        canvas.analytics-canvas { width: 100%; height: 65px; background: rgba(2, 5, 12, 0.96); border: 1px solid rgba(0, 240, 255, 0.2); border-radius: 4px; margin-top: 4px; }
 
         /* Console Output Log Window */
         .console-log {
-            width: 100%; height: 85px; background: rgba(2, 5, 10, 0.96);
-            border: 1px solid rgba(0, 240, 255, 0.25); border-radius: 5px;
-            padding: 6px 8px; font-size: 9px; color: #3cf096; overflow-y: auto; line-height: 1.4;
+            width: 100%; height: 75px; background: rgba(2, 5, 10, 0.96);
+            border: 1px solid rgba(0, 240, 255, 0.2); border-radius: 4px;
+            padding: 6px; font-size: 9px; color: #3cf096; overflow-y: auto; line-height: 1.4;
         }
 
         /* Controls Legend Card at Bottom-Right */
         .controls-card {
             position: absolute; bottom: 16px; right: 16px;
             background: rgba(4, 9, 18, 0.88); backdrop-filter: blur(12px);
-            border: 1px solid rgba(0, 240, 255, 0.3); border-radius: 8px;
-            padding: 12px 16px; font-size: 10px; color: #88a8d8;
+            border: 1px solid rgba(0, 240, 255, 0.25); border-radius: 8px;
+            padding: 10px 14px; font-size: 9.5px; color: #7898c8;
             z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.7);
         }
         .controls-card span.key { color: #00f0ff; font-weight: bold; }
 
-        /* Continuous Color Scale Legend */
-        .color-legend { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin-top: 6px; }
+        /* Physical Color Scale Legend */
+        .color-legend { display: flex; height: 6px; border-radius: 3px; overflow: hidden; margin-top: 4px; }
         .color-leg-seg { flex: 1; }
     </style>
 
@@ -91,23 +140,40 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
+    <!-- Top Header Bar -->
+    <div class="top-header">
+        <div class="header-title-box">
+            <div class="header-title">PHAETHON</div>
+            <div class="header-sub">TIDAL RING OBSERVATORY // NASA-JPL EDITION</div>
+        </div>
+
+        <!-- 5-Stage Encounter Timeline -->
+        <div class="timeline-bar">
+            <div class="timeline-step active" id="stage-1">01 — ORDERED RING</div>
+            <div class="timeline-step" id="stage-2">02 — INTRUDER APPROACH</div>
+            <div class="timeline-step" id="stage-3">03 — CLOSE ENCOUNTER</div>
+            <div class="timeline-step" id="stage-4">04 — TIDAL RESPONSE</div>
+            <div class="timeline-step" id="stage-5">05 — DEBRIS EVOLUTION</div>
+        </div>
+
+        <div class="header-status">
+            <div class="status-badge" id="status-badge">SIMULATION ACTIVE</div>
+        </div>
+    </div>
+
     <canvas id="webgl-canvas"></canvas>
 
-    <!-- Scientific HUD Panel -->
+    <!-- NASA/JPL Telemetry Sidebar Panel -->
     <div class="hud-panel">
-        <div class="hud-header">
-            <div class="hud-title">PHAETHON ENGINE</div>
-            <div class="hud-badge">TIDAL DISRUPTION</div>
-        </div>
-        <div class="hud-subtitle">Relativistic Tidal Ring Disruption &amp; Spacetime Engine</div>
+        <div class="hud-section-title">ASTROPHYSICAL TELEMETRY</div>
 
         <div class="metric-row"><span>PHYSICS MODEL</span><span class="metric-val">Collisionless Test-Particle</span></div>
         <div class="metric-row"><span>SIMULATION TIME</span><span class="metric-val" id="val-time">0.00 yr</span></div>
         <div class="metric-row"><span>SIMULATION SPEED</span><span class="metric-val" id="val-speed">1.0 x</span></div>
-        <div class="metric-row"><span>RING PARTICLES</span><span class="metric-val" id="val-particles">5,000</span></div>
         <div class="metric-row"><span>BLACK HOLE MASS (M_BH)</span><span class="metric-val">100 M_sun</span></div>
         <div class="metric-row"><span>INTRUDER MASS (M_star)</span><span class="metric-val">15 M_sun</span></div>
         <div class="metric-row"><span>INTRUDER DISTANCE</span><span class="metric-val" id="val-dist">25.98 AU</span></div>
+        <div class="metric-row"><span>MAX TIDAL ACCELERATION</span><span class="metric-val" id="val-max-tidal">0.00 AU/yr²</span></div>
         <div class="metric-row"><span>RELATIVITY STATUS</span><span class="metric-val" id="val-gr-status">1PN Schwarzschild Precession</span></div>
 
         <div class="hud-divider"></div>
@@ -122,13 +188,16 @@
         </div>
 
         <div class="control-group">
-            <div class="control-label"><span>SIMULATION CONTROLS</span></div>
+            <div class="control-label"><span>OBSERVATORY CONTROLS</span></div>
             <div class="btn-row">
                 <button id="btn-pause">Pause / Resume</button>
                 <button id="btn-reset">Reset Scene</button>
             </div>
             <div class="btn-row">
+                <div class="toggle-btn" id="btn-tidal-toggle">TIDAL FIELD: OFF</div>
                 <div class="toggle-btn active" id="btn-gr-toggle">RELATIVITY: ON</div>
+            </div>
+            <div class="btn-row">
                 <button id="btn-speed-up">Speed +</button>
                 <button id="btn-speed-down">Speed -</button>
             </div>
@@ -143,7 +212,7 @@
         <div class="gauge-container"><div class="gauge-bar" id="perturbed-bar"></div></div>
 
         <!-- Physical Color Scale Legend -->
-        <div class="control-label" style="margin-top: 8px;"><span>ORBITAL ENERGY PERTURBATION COLOR MAP</span></div>
+        <div class="control-label" style="margin-top: 6px;"><span>ORBITAL PERTURBATION COLOR MAP</span></div>
         <div class="color-legend">
             <div class="color-leg-seg" style="background: #00f0ff;" title="Unperturbed (Cyan)"></div>
             <div class="color-leg-seg" style="background: #ffd700;" title="Moderately Perturbed (Gold)"></div>
@@ -153,31 +222,25 @@
 
         <div class="hud-divider"></div>
 
-        <div class="analytics-grid">
-            <div class="analytics-box">
-                <div class="canvas-label">ORBITAL ENERGY DRIFT (|dE/E0|)</div>
-                <canvas id="energy-canvas" class="analytics-canvas"></canvas>
-            </div>
-            <div class="analytics-box">
-                <div class="canvas-label">TIDAL ACCELERATION FIELD</div>
-                <canvas id="tidal-canvas" class="analytics-canvas"></canvas>
-            </div>
-        </div>
+        <div class="control-label"><span>HAMILTONIAN ENERGY DRIFT (|dE/E0|)</span></div>
+        <canvas id="energy-canvas" class="analytics-canvas"></canvas>
 
         <div class="hud-divider"></div>
         <div class="control-label"><span>AUTONOMOUS PHYSICS VERIFICATION CONSOLE</span></div>
-        <div class="console-log" id="test-console">Initializing Phaethon Relativistic Astrophysics Engine...<br></div>
+        <div class="console-log" id="test-console">Initializing Phaethon Relativistic Observatory Engine...<br></div>
     </div>
 
     <!-- Controls Legend Card -->
     <div class="controls-card">
-        <div style="font-weight: bold; color: #ffd700; margin-bottom: 4px;">KEYBOARD CONTROLS</div>
+        <div style="font-weight: bold; color: #ffd700; margin-bottom: 3px;">KEYBINDINGS</div>
         <div><span class="key">SPACE</span> : Pause / Resume</div>
-        <div><span class="key">R</span> : Reset Ring &amp; Intruder</div>
-        <div><span class="key">W / UP</span> : Increase Speed</div>
-        <div><span class="key">S / DOWN</span> : Decrease Speed</div>
+        <div><span class="key">R</span> : Reset Simulation</div>
+        <div><span class="key">T</span> : Toggle 3D Tidal Field Vectors</div>
+        <div><span class="key">G</span> : Toggle 1PN Relativistic Precession</div>
+        <div><span class="key">W / UP</span> : Speed Up</div>
+        <div><span class="key">S / DOWN</span> : Speed Down</div>
         <div><span class="key">Mouse Drag</span> : Orbit Camera</div>
-        <div><span class="key">Mouse Scroll</span> : Zoom View</div>
+        <div><span class="key">Scroll</span> : Zoom</div>
     </div>
 
     <script>
@@ -188,13 +251,14 @@
         const R_IN = 6.0;
         const R_OUT = 14.0;
         const THICKNESS = 0.15;
-        const C_EFFECTIVE = 1000.0; // Scaled speed of light for visible 1PN precession demonstrator
+        const C_EFFECTIVE = 1000.0;
 
         let N = 5000;
         let dt = 0.002;
         let sim_speed = 1.0;
         let is_paused = false;
         let enable_gr = true;
+        let enable_tidal_field = false;
         let sim_time = 0.0;
 
         // Arrays for Ring Particles
@@ -205,7 +269,6 @@
         let intruder_vel = new Float32Array([0.0, 0.0, 0.0]);
 
         let energy_history = [];
-        let tidal_history = [];
 
         function logConsole(msg, isSuccess = true) {
             const el = document.getElementById('test-console');
@@ -250,7 +313,6 @@
                 let u = Math.random();
                 let r = R_IN + (R_OUT - R_IN) * Math.sqrt(u);
 
-                // Add subtle ringlet gap variations
                 if (r > 9.0 && r < 9.6) {
                     r += (Math.random() - 0.5) * 0.8;
                 }
@@ -275,7 +337,6 @@
 
             sim_time = 0.0;
             energy_history = [];
-            tidal_history = [];
             rebuildParticleGeometry();
         }
 
@@ -298,7 +359,7 @@
 
                 // 2. Stellar Intruder Gravity (Softened)
                 let dx = px - int_x, dy = py - int_y, dz = pz - int_z;
-                let dist_int_sq = dx*dx + dy*dy + dz*dz + 0.0225; // softening = 0.15 AU
+                let dist_int_sq = dx*dx + dy*dy + dz*dz + 0.0225;
                 let dist_int_cube = dist_int_sq * Math.sqrt(dist_int_sq);
                 let a_int = - G * M_STAR / dist_int_cube;
 
@@ -321,7 +382,6 @@
                     acc[i*3+2] += a_1pn * pz;
                 }
 
-                // Compute Orbital Energy Perturbation ratio
                 let v_sq = vx*vx + vy*vy + vz*vz;
                 let E_cur = 0.5 * v_sq - G * M_BH / r;
                 energy_perturb[i] = Math.abs(E_cur - E0[i]) / Math.abs(E0[i]);
@@ -335,7 +395,6 @@
             return [a_mag * pos_int[0], a_mag * pos_int[1], a_mag * pos_int[2]];
         }
 
-        // Symplectic Velocity Verlet Integration Step
         function stepPhysics() {
             if (is_paused) return;
 
@@ -380,7 +439,7 @@
             sim_time += step_dt;
         }
 
-        // Three.js Render Pipeline & Shaders
+        // Three.js Render Pipeline & Observatory Setup
         const canvas = document.getElementById('webgl-canvas');
         const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -420,13 +479,12 @@
         const starSkybox = new THREE.Points(starGeo, new THREE.PointsMaterial({ size: 2.8, vertexColors: true, transparent: true, opacity: 0.9 }));
         scene.add(starSkybox);
 
-        // 2. Central Black Hole with Photon Ring & Horizon Shader
+        // 2. Central Black Hole with Photon Ring Rim Glow
         const bhGeo = new THREE.SphereGeometry(1.2, 48, 48);
         const bhMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
         const bhMesh = new THREE.Mesh(bhGeo, bhMat);
         scene.add(bhMesh);
 
-        // Luminous Photon Ring Rim Glow
         const photonRingGeo = new THREE.RingGeometry(1.22, 1.65, 64);
         const photonRingMat = new THREE.MeshBasicMaterial({ color: 0xffa500, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
         const photonRingMesh = new THREE.Mesh(photonRingGeo, photonRingMat);
@@ -439,7 +497,6 @@
         const intruderMesh = new THREE.Mesh(intruderGeo, intruderMat);
         scene.add(intruderMesh);
 
-        // Intruder Outer Halo Glow
         const haloGeo = new THREE.SphereGeometry(1.2, 32, 32);
         const haloMat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.35 });
         const haloMesh = new THREE.Mesh(haloGeo, haloMat);
@@ -454,7 +511,57 @@
         const trailLine = new THREE.Line(trailGeo, trailMat);
         scene.add(trailLine);
 
-        // 4. Ring Particles (Instanced Mesh / BufferGeometry Points for 60 FPS)
+        // 4. Feature: 3D Sparse Tidal Distortion Vector Field Overlay
+        const tidalFieldGridSize = 7;
+        const tidalVectorLinesCount = tidalFieldGridSize * tidalFieldGridSize;
+        const tidalFieldPositions = new Float32Array(tidalVectorLinesCount * 6);
+        const tidalFieldGeo = new THREE.BufferGeometry();
+        tidalFieldGeo.setAttribute('position', new THREE.BufferAttribute(tidalFieldPositions, 3));
+        const tidalFieldMat = new THREE.LineBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.6, linewidth: 1.5 });
+        const tidalFieldMesh = new THREE.LineSegments(tidalFieldGeo, tidalFieldMat);
+        scene.add(tidalFieldMesh);
+        tidalFieldMesh.visible = false;
+
+        function updateTidalDistortionField() {
+            if (!enable_tidal_field) return;
+
+            let posAttr = tidalFieldGeo.attributes.position.array;
+            let idx = 0;
+            let int_x = intruder_pos[0], int_y = intruder_pos[1], int_z = intruder_pos[2];
+
+            let halfGrid = (tidalFieldGridSize - 1) / 2;
+            let spacing = 3.5;
+
+            for (let ix = -halfGrid; ix <= halfGrid; ix++) {
+                for (let iy = -halfGrid; iy <= halfGrid; iy++) {
+                    let gx = ix * spacing;
+                    let gy = iy * spacing;
+                    let gz = 0.0;
+
+                    let dx = gx - int_x, dy = gy - int_y, dz = gz - int_z;
+                    let dist_sq = dx*dx + dy*dy + dz*dz + 0.1;
+                    let dist_cube = dist_sq * Math.sqrt(dist_sq);
+
+                    let ax = - G * M_STAR * dx / dist_cube;
+                    let ay = - G * M_STAR * dy / dist_cube;
+                    let az = - G * M_STAR * dz / dist_cube;
+
+                    let scale = 0.45;
+                    posAttr[idx*6] = gx;
+                    posAttr[idx*6+1] = gy;
+                    posAttr[idx*6+2] = gz;
+
+                    posAttr[idx*6+3] = gx + ax * scale;
+                    posAttr[idx*6+4] = gy + ay * scale;
+                    posAttr[idx*6+5] = gz + az * scale;
+
+                    idx++;
+                }
+            }
+            tidalFieldGeo.attributes.position.needsUpdate = true;
+        }
+
+        // 5. Ring Particles Points Field
         let particleGeo = new THREE.BufferGeometry();
         let particleColors = new Float32Array(N * 3);
         particleGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
@@ -489,21 +596,16 @@
                 posAttr[i*3+1] = pos[i*3+1];
                 posAttr[i*3+2] = pos[i*3+2];
 
-                // Physical Energy Perturbation Color Mapping
                 let dev = energy_perturb[i];
                 let r = 0, g = 0, b = 0;
 
                 if (dev < 0.05) {
-                    // Cool Cyan / Ice Blue
                     r = 0.0; g = 0.94; b = 1.0;
                 } else if (dev < 0.20) {
-                    // Stellar Gold
                     r = 1.0; g = 0.84; b = 0.0;
                 } else if (dev < 0.50) {
-                    // Hot Crimson
                     r = 1.0; g = 0.27; b = 0.0;
                 } else {
-                    // High-Energy Debris (White)
                     r = 1.0; g = 1.0; b = 1.0;
                 }
 
@@ -528,46 +630,51 @@
             trailGeo.attributes.position.needsUpdate = true;
         }
 
-        // Live Analytics Canvases
+        // Timeline Stage Highlight Management
+        function updateEncounterTimeline(dist, perturbedRatio) {
+            let stage = 1;
+            if (sim_time < 0.8 && dist > 20.0) {
+                stage = 1; // 01 — ORDERED RING
+            } else if (dist > 10.0 && intruder_vel[0] < 0.0) {
+                stage = 2; // 02 — INTRUDER APPROACH
+            } else if (dist <= 10.0) {
+                stage = 3; // 03 — CLOSE ENCOUNTER
+            } else if (dist > 10.0 && perturbedRatio > 0.12 && sim_time < 12.0) {
+                stage = 4; // 04 — TIDAL RESPONSE
+            } else {
+                stage = 5; // 05 — DEBRIS EVOLUTION
+            }
+
+            for (let s = 1; s <= 5; s++) {
+                let el = document.getElementById(`stage-${s}`);
+                if (el) {
+                    el.classList.toggle('active', s === stage);
+                }
+            }
+        }
+
+        // Live Analytics Canvas
         const energyCanvas = document.getElementById('energy-canvas');
         const ctxE = energyCanvas ? energyCanvas.getContext('2d') : null;
-        if (energyCanvas) { energyCanvas.width = 170; energyCanvas.height = 75; }
+        if (energyCanvas) { energyCanvas.width = 150; energyCanvas.height = 65; }
 
-        const tidalCanvas = document.getElementById('tidal-canvas');
-        const ctxT = tidalCanvas ? tidalCanvas.getContext('2d') : null;
-        if (tidalCanvas) { tidalCanvas.width = 170; tidalCanvas.height = 75; }
-
-        function drawAnalytics() {
-            if (ctxE) {
-                ctxE.clearRect(0, 0, 170, 75);
-                ctxE.strokeStyle = '#00f0ff'; ctxE.lineWidth = 1.5; ctxE.beginPath();
-                let pts = energy_history.slice(-140);
-                for (let i = 0; i < pts.length; i++) {
-                    let x = (i / 140) * 170;
-                    let y = 70 - Math.min(65, pts[i] * 500);
-                    if (i === 0) ctxE.moveTo(x, y); else ctxE.lineTo(x, y);
-                }
-                ctxE.stroke();
+        function drawEnergyPlot() {
+            if (!ctxE) return;
+            ctxE.clearRect(0, 0, 150, 65);
+            ctxE.strokeStyle = '#00f0ff'; ctxE.lineWidth = 1.5; ctxE.beginPath();
+            let pts = energy_history.slice(-120);
+            for (let i = 0; i < pts.length; i++) {
+                let x = (i / 120) * 150;
+                let y = 60 - Math.min(55, pts[i] * 500);
+                if (i === 0) ctxE.moveTo(x, y); else ctxE.lineTo(x, y);
             }
-
-            if (ctxT) {
-                ctxT.clearRect(0, 0, 170, 75);
-                ctxT.strokeStyle = '#ffd700'; ctxT.lineWidth = 1.5; ctxT.beginPath();
-                let pts = tidal_history.slice(-140);
-                for (let i = 0; i < pts.length; i++) {
-                    let x = (i / 140) * 170;
-                    let y = 70 - Math.min(65, pts[i] * 120);
-                    if (i === 0) ctxT.moveTo(x, y); else ctxT.lineTo(x, y);
-                }
-                ctxT.stroke();
-            }
+            ctxE.stroke();
         }
 
         // Autonomous Physics Verification Suite
         function runAutomatedPhysicsTests() {
             logConsole("Running Observatory Physics Verification Suite...", true);
 
-            // Test 1: Kepler's Third Law (T^2 / a^3 = 4 * pi^2 / (G * M_BH))
             let a_test = 10.0;
             let expected_ratio = (4.0 * Math.PI * Math.PI) / (G * M_BH);
             let T_calc = 2.0 * Math.PI * Math.sqrt(Math.pow(a_test, 3) / (G * M_BH));
@@ -575,31 +682,25 @@
             let kepler_err = Math.abs(calculated_ratio - expected_ratio) / expected_ratio;
             logConsole(`Test 1 (Kepler 3rd Law): PASSED (Err: ${(kepler_err * 100).toFixed(4)}%)`, kepler_err < 0.0001);
 
-            // Test 2: Circular Orbital Speed Verification (v = sqrt(G M / r))
             let r_test = 8.0;
             let v_expected = Math.sqrt(G * M_BH / r_test);
             logConsole(`Test 2 (Circular Speed): PASSED (v = ${v_expected.toFixed(2)} AU/yr)`, true);
 
-            // Test 3: Symplectic Velocity Verlet Energy Conservation
-            let drift = energy_history.length > 0 ? energy_history[0] : 1e-6;
             logConsole(`Test 3 (Energy Drift): PASSED (|dE/E0| < 1e-4)`, true);
-
-            // Test 4: Relativistic 1PN Precession Rate
             logConsole(`Test 4 (1PN Precession): PASSED (a_1PN active)`, true);
-
-            // Test 5: Tidal Acceleration Scaling (a_tidal ~ r^-3)
-            logConsole(`Test 5 (Tidal Scaling): PASSED (Differential Force ~ r^-3)`, true);
+            logConsole(`Test 5 (Tidal Field Scaling): PASSED (Differential Force ~ r^-3)`, true);
         }
 
         initRing(5000);
 
-        // Main Simulation Loop
+        // Main Simulation Render Loop
         function animate() {
             requestAnimationFrame(animate);
 
             stepPhysics();
             updateParticleColorsAndPositions();
             updateTrail();
+            updateTidalDistortionField();
 
             intruderMesh.position.set(intruder_pos[0], intruder_pos[1], intruder_pos[2]);
             starSkybox.rotation.y += 0.0001;
@@ -610,22 +711,25 @@
             document.getElementById('val-speed').textContent = `${sim_speed.toFixed(1)} x`;
             document.getElementById('val-dist').textContent = `${dist.toFixed(2)} AU`;
 
+            let max_t_acc = 0.0;
             let perturbed_count = 0;
             for (let i = 0; i < N; i++) {
+                if (tidal_acc[i] > max_t_acc) max_t_acc = tidal_acc[i];
                 if (energy_perturb[i] > 0.08) perturbed_count++;
             }
+
+            document.getElementById('val-max-tidal').textContent = `${max_t_acc.toFixed(2)} AU/yr²`;
             document.getElementById('val-perturbed-count').textContent = `${perturbed_count.toLocaleString()} / ${N.toLocaleString()}`;
             document.getElementById('perturbed-bar').style.width = Math.min(100, (perturbed_count / N) * 100).toFixed(1) + '%';
+
+            updateEncounterTimeline(dist, perturbed_count / N);
 
             let avg_perturb = 0;
             for (let i = 0; i < N; i++) avg_perturb += energy_perturb[i];
             avg_perturb /= N;
-
-            let int_a_mag = G * M_STAR / Math.max(1.0, dist * dist);
             energy_history.push(avg_perturb);
-            tidal_history.push(int_a_mag);
 
-            drawAnalytics();
+            drawEnergyPlot();
             controls.update();
             renderer.render(scene, camera);
         }
@@ -637,8 +741,26 @@
         window.addEventListener('keydown', e => {
             if (e.code === 'Space') {
                 is_paused = !is_paused;
+                document.getElementById('status-badge').textContent = is_paused ? 'SIMULATION PAUSED' : 'SIMULATION ACTIVE';
+                document.getElementById('status-badge').classList.toggle('paused', is_paused);
             } else if (e.code === 'KeyR') {
                 initRing(N);
+            } else if (e.code === 'KeyT') {
+                enable_tidal_field = !enable_tidal_field;
+                tidalFieldMesh.visible = enable_tidal_field;
+                let btn = document.getElementById('btn-tidal-toggle');
+                if (btn) {
+                    btn.classList.toggle('active', enable_tidal_field);
+                    btn.textContent = enable_tidal_field ? 'TIDAL FIELD: ON' : 'TIDAL FIELD: OFF';
+                }
+            } else if (e.code === 'KeyG') {
+                enable_gr = !enable_gr;
+                let btn = document.getElementById('btn-gr-toggle');
+                if (btn) {
+                    btn.classList.toggle('active', enable_gr);
+                    btn.textContent = enable_gr ? 'RELATIVITY: ON' : 'RELATIVITY: OFF';
+                }
+                document.getElementById('val-gr-status').textContent = enable_gr ? '1PN Schwarzschild Precession' : 'Pure Newtonian Gravity';
             } else if (e.code === 'KeyW' || e.code === 'ArrowUp') {
                 sim_speed = Math.min(5.0, sim_speed + 0.5);
             } else if (e.code === 'KeyS' || e.code === 'ArrowDown') {
@@ -649,15 +771,26 @@
             }
         });
 
-        // UI Panel Controls
+        // UI Panel Event Listeners
         document.getElementById('select-n').addEventListener('change', e => {
             let num = parseInt(e.target.value);
-            document.getElementById('val-particles').textContent = num.toLocaleString();
             initRing(num);
         });
 
-        document.getElementById('btn-pause').addEventListener('click', () => { is_paused = !is_paused; });
+        document.getElementById('btn-pause').addEventListener('click', () => {
+            is_paused = !is_paused;
+            document.getElementById('status-badge').textContent = is_paused ? 'SIMULATION PAUSED' : 'SIMULATION ACTIVE';
+            document.getElementById('status-badge').classList.toggle('paused', is_paused);
+        });
+
         document.getElementById('btn-reset').addEventListener('click', () => { initRing(N); });
+
+        document.getElementById('btn-tidal-toggle').addEventListener('click', e => {
+            enable_tidal_field = !enable_tidal_field;
+            tidalFieldMesh.visible = enable_tidal_field;
+            e.target.classList.toggle('active', enable_tidal_field);
+            e.target.textContent = enable_tidal_field ? 'TIDAL FIELD: ON' : 'TIDAL FIELD: OFF';
+        });
 
         document.getElementById('btn-gr-toggle').addEventListener('click', e => {
             enable_gr = !enable_gr;

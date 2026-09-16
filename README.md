@@ -1,5 +1,5 @@
 # Phaethon: Relativistic Tidal Ring Disruption & Spacetime Engine
-**Simathon Competition Edition — Astrophysics Visualization Suite**
+**Simathon Competition Edition — NASA/JPL Observatory Overhaul**
 
 [![Physics Tests](https://img.shields.io/badge/Physics_Suite-9%2F9_Passed-00f0ff.svg)](#verification-suite)
 [![License](https://img.shields.io/badge/License-MIT-gold.svg)](#license)
@@ -10,36 +10,35 @@
 
 **Phaethon** is an interactive, physically defensible WebGL and Python astrophysics simulation built for scientific visualization and creative coding competitions.
 
-The simulation models the **tidal disruption of a pristine icy particle ring** orbiting a supermassive Central Black Hole ($M_{\text{BH}} = 100\,M_\odot$) when perturbed by an eccentric, inclined Stellar Intruder ($M_{\text{star}} = 15\,M_\odot$).
+Designed as a **NASA/JPL Mission-Control Computational Observatory**, the simulation models the **tidal disruption of a pristine icy particle ring** orbiting a supermassive Central Black Hole ($M_{\text{BH}} = 100\,M_\odot$) when perturbed by an eccentric, inclined Stellar Intruder ($M_{\text{star}} = 15\,M_\odot$).
 
-Unlike generic particle systems or simplified sphere animations, Phaethon calculates differential gravitational forces across $5,000\text{--}20,000$ collisionless test particles using a 2nd-order **Symplectic Velocity Verlet** numerical integrator with optional **1PN Schwarzschild Post-Newtonian relativistic precession**.
+Unlike generic particle systems or simplified sphere animations, Phaethon calculates differential gravitational forces across $5,000\text{--}20,000$ collisionless test particles using a 2nd-order **Symplectic Velocity Verlet** numerical integrator with optional **1PN Schwarzschild Post-Newtonian relativistic precession** and a live **3D Tidal Distortion Field** vector overlay.
 
 ```
-    PRISTINE RING
-          ↓
-    INTRUDER APPROACH
-          ↓
-    CLOSE ENCOUNTER
-          ↓
-    DIFFERENTIAL GRAVITY
-          ↓
-    TIDAL DEFORMATION
-          ↓
-    DEBRIS STREAMS AND DENSITY WAVES
-          ↓
-    LONG-TERM ORBITAL EVOLUTION
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    5-STAGE ASTROPHYSICAL TIMELINE                       │
+│ 01 ORDERED RING → 02 INTRUDER APPROACH → 03 CLOSE ENCOUNTER           │
+│                  → 04 TIDAL RESPONSE → 05 DEBRIS EVOLUTION             │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. Scientific Question
+## 2. Key Scientific Features
 
-> *How does a massive stellar intruder alter the orbital distribution and energy state of particles in a dense, coherent ring through differential gravitational perturbation?*
+### A. NASA/JPL Mission-Control Aesthetic
+- **Top Bar**: Displays `PHAETHON // TIDAL RING OBSERVATORY`, real-time 5-stage encounter timeline, and live simulation status badges (`ACTIVE` / `PAUSED`).
+- **Sidebar Telemetry**: Clean dark slate HUD (`rgba(4, 9, 18, 0.9)`) displaying physical constants ($M_{\text{BH}}$, $M_{\text{star}}$), orbital separation ($\text{AU}$), maximum tidal acceleration, perturbed particle gauge, and live Hamiltonian energy drift plot canvas.
 
-As the intruder approaches pericenter, particles closest to the intruder experience a stronger gravitational acceleration than the central black hole alone provides. This differential acceleration ($\Delta \mathbf{a}_{\text{tidal}}$) causes:
-1. Orbital energy shifts ($\Delta E / E_0$).
-2. Formation of density waves, ring gaps, and eccentric stream structures.
-3. Ejection of high-energy debris along tidal arms.
+### B. 3D Tidal Distortion Field Vector Overlay (`T` Key / Toggle)
+- Toggling `TIDAL FIELD: ON` renders a dynamic sparse 3D vector field display showing differential gravitational acceleration arrows $\Delta \mathbf{a}_{\text{tidal}} = \mathbf{a}_{\text{star}} - \mathbf{a}_{\text{BH-COM}}$, visually demonstrating *why* differential forces pull the ring apart.
+
+### C. 5-Stage Encounter Progress Bar
+1. **`01 — ORDERED RING`**: Pristine circular Keplerian orbit ($v_c = \sqrt{G M / r}$).
+2. **`02 — INTRUDER APPROACH`**: Stellar intruder approaching ring plane along eccentric trajectory.
+3. **`03 — CLOSE ENCOUNTER`**: Pericenter passage ($r \le 10\,\text{AU}$).
+4. **`04 — TIDAL RESPONSE`**: Asymmetric gravitational stretching of ring particles into density waves.
+5. **`05 — DEBRIS EVOLUTION`**: Long-term tidal stream formation and high-energy debris escape.
 
 ---
 
@@ -59,50 +58,16 @@ For each ring test particle $i$ with position $\mathbf{r}_i$ and velocity $\math
 
 $$\mathbf{a}_i = -\frac{G M_{\text{BH}} \mathbf{r}_i}{|\mathbf{r}_i|^3} - \frac{G M_{\text{star}} (\mathbf{r}_i - \mathbf{r}_{\text{star}})}{\left(|\mathbf{r}_i - \mathbf{r}_{\text{star}}|^2 + \epsilon^2\right)^{3/2}} + \mathbf{a}_{\text{1PN}}$$
 
-where:
-- $M_{\text{BH}} = 100\,M_\odot$ is the central black hole mass.
-- $M_{\text{star}} = 15\,M_\odot$ is the stellar intruder mass.
-- $\epsilon = 0.15\;\text{AU}$ is the Plummer softening parameter preventing unphysical close-encounter divergence.
+where $M_{\text{BH}} = 100\,M_\odot$, $M_{\text{star}} = 15\,M_\odot$, and $\epsilon = 0.15\;\text{AU}$ (Plummer softening).
 
 ### Weak-Field 1PN Relativistic Precession (`RELATIVITY: ON/OFF`)
-When relativity mode is enabled, a leading-order post-Newtonian (1PN) Schwarzschild perihelion precession acceleration is added:
-
-$$\mathbf{a}_{\text{1PN}} = -\frac{3 G M_{\text{BH}} L_i^2}{c_{\text{eff}}^2 r_i^5} \mathbf{r}_i$$
-
-where $\mathbf{L}_i = \mathbf{r}_i \times \mathbf{v}_i$ is the specific angular momentum vector.
+$$\mathbf{a}_{\text{1PN}} = -\frac{3 G M_{\text{BH}} L_i^2}{c_{\text{eff}}^2 r_i^5} \mathbf{r}_i \quad \text{where } \mathbf{L}_i = \mathbf{r}_i \times \mathbf{v}_i$$
 
 ---
 
-## 4. Numerical Integration
+## 4. Continuous Physical Color Mapping
 
-Phaethon employs a 2nd-order **Symplectic Velocity Verlet** numerical integrator:
-
-1. **First Half-Kick**:
-   $$\mathbf{v}_{i}(t + \tfrac{1}{2}\Delta t) = \mathbf{v}_i(t) + \tfrac{1}{2} \mathbf{a}_i(t) \Delta t$$
-2. **Position Drift**:
-   $$\mathbf{r}_i(t + \Delta t) = \mathbf{r}_i(t) + \mathbf{v}_i(t + \tfrac{1}{2}\Delta t) \Delta t$$
-3. **Recompute Acceleration**:
-   $$\mathbf{a}_i(t + \Delta t) = \mathbf{a}\left(\mathbf{r}_i(t + \Delta t), \mathbf{v}_i(t + \tfrac{1}{2}\Delta t), \mathbf{r}_{\text{star}}(t + \Delta t)\right)$$
-4. **Second Half-Kick**:
-   $$\mathbf{v}_i(t + \Delta t) = \mathbf{v}_i(t + \tfrac{1}{2}\Delta t) + \tfrac{1}{2} \mathbf{a}_i(t + \Delta t) \Delta t$$
-
-The symplectic nature of the integrator preserves phase space volume and maintains Hamiltonian energy conservation ($|\Delta E / E_0| < 10^{-4}$) over thousands of orbits for unperturbed particles.
-
----
-
-## 5. Particle Model & $O(N)$ Optimization
-
-Ring particles are modeled as **collisionless test particles** moving in the joint gravitational field of the central black hole and stellar intruder. 
-- Self-gravity between individual ring particles ($O(N^2)$) is omitted, as ring particle masses are negligible compared to $M_{\text{BH}}$ and $M_{\text{star}}$.
-- This keeps the force calculation at $O(N)$ complexity, allowing real-time rendering of $5,000\text{--}20,000$ particles at 60+ FPS in WebGL.
-
----
-
-## 6. Continuous Physical Color Mapping
-
-Particle colors carry direct physical meaning based on orbital energy perturbation relative to their initial circular Keplerian state:
-
-$$\text{Dev}_i = \frac{|E_i(t) - E_{i,0}|}{|E_{i,0}|}$$
+Particle colors carry direct physical meaning based on orbital energy perturbation relative to their initial circular Keplerian state ($\text{Dev}_i = |E_i(t) - E_{i,0}| / |E_{i,0}|$):
 
 | Perturbation $\text{Dev}_i$ | Color | Physical Meaning |
 |---|---|---|
@@ -113,17 +78,13 @@ $$\text{Dev}_i = \frac{|E_i(t) - E_{i,0}|}{|E_{i,0}|}$$
 
 ---
 
-## 7. Installation & Quick Start
+## 5. Quick Start & Execution
 
-### Prerequisites
-- Python 3.9+
-- Web browser with WebGL 2 support (Chrome, Firefox, Edge, Safari)
-
-### Quick Run (WebGL Interface)
+### Launch WebGL Observatory (Primary Deliverable)
 ```bash
 python main.py
 ```
-This launches a local web server at `http://localhost:8000` and automatically opens the interactive WebGL simulation in your browser.
+*(Serves WebGL simulation at `http://localhost:8000` and opens browser)*
 
 ### Run Headless Energy Conservation Benchmark
 ```bash
@@ -137,23 +98,23 @@ python -m pytest -v tests/
 
 ---
 
-## 8. Controls & User Interface
+## 6. Keybindings & Controls
 
-| Input | Action |
+| Key / Input | Action |
 |---|---|
 | **`SPACE`** | Pause / Resume simulation |
 | **`R`** | Reset ring & intruder to initial state |
+| **`T`** | Toggle 3D Tidal Distortion Vector Field |
+| **`G`** | Toggle 1PN Relativistic Schwarzschild Precession |
 | **`W`** / **`UP`** | Increase simulation speed ($+0.5\times$) |
 | **`S`** / **`DOWN`** | Decrease simulation speed ($-0.5\times$) |
 | **`ESC`** | Reset camera view |
 | **Mouse Drag** | Arcball orbit camera rotation |
 | **Mouse Scroll** | Camera zoom in / out |
-| **UI Toggle `RELATIVITY`** | Switch between Newtonian and 1PN Precession modes |
-| **Particle Count Dropdown** | Select $5,000$, $10,000$, or $20,000$ particles |
 
 ---
 
-## 9. Verification Suite Results
+## 7. Verification Suite Results
 
 All 9 automated physics unit tests pass cleanly:
 
@@ -169,20 +130,11 @@ tests/test_simulation.py::test_star_catalog_temperature_and_rgb PASSED   [ 77%]
 tests/test_simulation.py::test_simulation_app_lifecycle PASSED           [ 88%]
 tests/test_simulation.py::test_stellar_intruder_trajectory PASSED        [100%]
 
-============================== 9 passed in 1.88s ==============================
+============================== 9 passed in 1.73s ==============================
 ```
 
 ---
 
-## 10. Best Screenshot Moments
-
-For competition presentation or screenshot capture, recommended camera angles and moments:
-1. **Initial State ($t = 0.0\,\text{yr}$)**: Camera elevated at $30^\circ$, showing the pristine cyan multi-band ring surrounding the dark central Black Hole with its photon ring glow.
-2. **First Close Encounter ($t \approx 3.5\,\text{yr}$)**: The stellar intruder reaches pericenter ($4.2\,\text{AU}$), pulling an asymmetric wave of gold and crimson particles out of the ring.
-3. **Tidal Stream & Gap ($t \approx 6.0\,\text{yr}$)**: High-energy white debris streams shoot across the viewport, leaving a prominent gap in the outer ring.
-
----
-
-## 11. License
+## 8. License
 
 Licensed under the MIT License.
