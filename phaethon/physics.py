@@ -1,331 +1,242 @@
-# Approximations: Newtonian gravity with General Relativistic Schwarzschild precession correction term and J2 quadrupole moment; dipole magnetic fields and radiation pressure omitted.
+# Approximations: Central Newtonian gravity with weak-field 1PN Schwarzschild perihelion precession correction term and N-body gravitational perturbation from a massive stellar intruder. Collisionless test-particle ring model.
 
 """
-Phaethon Advanced Physics Engine
---------------------------------
-Symplectic Velocity Verlet Integrator, Rubble-Pile Moon Model with Hierarchical
-Variable Particle Sizes, Differential Tidal Vector Calculation, Debris Focus Tracking,
-and Disruption Event Detection.
+Phaethon Astrophysics Engine: Collisionless Tidal Ring & Relativistic Disruption
+=================================================================================
+Units: Astronomical Units (AU), Solar Masses (M_sun), Years (yr).
+In these units, G = 4 * pi^2 approx 39.47841760435743.
+Speed of light c = 63239.7 AU/yr.
 """
 
 import numpy as np
 
-class RubblePileMoon:
+# Fundamental Astronomical Constants (AU, M_sun, yr)
+G_CONST = 4.0 * (np.pi ** 2)
+C_LIGHT = 63239.7
+
+class CentralBlackHole:
+    """Central non-rotating Schwarzschild Black Hole."""
+    def __init__(self, mass: float = 100.0, radius: float = 0.5):
+        self.mass = mass
+        self.radius = radius
+        self.position = np.array([0.0, 0.0, 0.0], dtype=np.float64)
+        self.velocity = np.array([0.0, 0.0, 0.0], dtype=np.float64)
+
+
+class StellarIntruder:
+    """Massive stellar intruder following an eccentric, inclined Keplerian orbit."""
+    def __init__(
+        self,
+        mass: float = 15.0,
+        pericenter: float = 4.0,
+        eccentricity: float = 0.85,
+        inclination_deg: float = 25.0,
+        central_mass: float = 100.0
+    ):
+        self.mass = mass
+        self.pericenter = pericenter
+        self.eccentricity = eccentricity
+        self.inclination = np.radians(inclination_deg)
+        self.central_mass = central_mass
+        
+        # Orbital parameters
+        self.a = pericenter / (1.0 - eccentricity)
+        self.period = 2.0 * np.pi * np.sqrt((self.a ** 3) / (G_CONST * (central_mass + mass)))
+        
+        self.position = np.zeros(3, dtype=np.float64)
+        self.velocity = np.zeros(3, dtype=np.float64)
+        
+        # Initialize at apocenter
+        self.reset()
+
+    def reset(self):
+        r_apo = self.a * (1.0 + self.eccentricity)
+        v_apo = np.sqrt(G_CONST * (self.central_mass + self.mass) * (2.0 / r_apo - 1.0 / self.a))
+        
+        # Un-inclined coordinates at apocenter (along +X, moving in +Y)
+        x0 = r_apo
+        y0 = 0.0
+        vx0 = 0.0
+        vy0 = -v_apo
+        
+        # Rotate by inclination around X axis
+        cos_i = np.cos(self.inclination)
+        sin_i = np.sin(self.inclination)
+        
+        self.position[0] = x0
+        self.position[1] = y0 * cos_i
+        self.position[2] = y0 * sin_i
+        
+        self.velocity[0] = vx0
+        self.velocity[1] = vy0 * cos_i
+        self.velocity[2] = vy0 * sin_i
+
+
+class CollisionlessTidalRing:
     """
-    Rubble-pile moon composed of N sub-particles bound by mutual gravity
-    and cohesive spring forces, with hierarchical variable particle radii and masses.
+    Pristine, multi-band ring of collisionless icy test particles
+    orbiting a central black hole, perturbed by a massive stellar intruder.
     """
     def __init__(
         self,
-        num_particles: int = 200,
-        moon_radius: float = 0.35,
-        total_mass: float = 1.0,
-        initial_orbital_radius: float = 12.0,
-        host_mass: float = 1000.0,
-        g_const: float = 1.0,
-        k_spring: float = 80.0,
-        strain_limit: float = 0.50,
-        spring_damping: float = 0.8,
+        num_particles: int = 5000,
+        r_inner: float = 6.0,
+        r_outer: float = 14.0,
+        thickness: float = 0.15,
+        central_mass: float = 100.0,
         seed: int = 42
     ):
         self.N = num_particles
-        self.radius = moon_radius
-        self.total_mass = total_mass
-        self.initial_r = initial_orbital_radius
-        self.host_mass = host_mass
-        self.G = g_const
-        self.k_spring = k_spring
-        self.strain_limit = strain_limit
-        self.spring_damping = spring_damping
-
+        self.r_inner = r_inner
+        self.r_outer = r_outer
+        self.thickness = thickness
+        self.central_mass = central_mass
         self.rng = np.random.default_rng(seed)
 
-        # Hierarchical Variable Particle Radii & Mass Distribution
-        rank = np.linspace(0.0, 1.0, num_particles)
-        self.particle_radii = 0.015 + 0.065 * (rank ** 2.2)
-        vol_sum = np.sum(self.particle_radii ** 3)
-        self.masses = total_mass * ((self.particle_radii ** 3) / vol_sum)
-        self.m_mean = total_mass / num_particles
-
-        # Random shape offsets for non-spherical 3D asteroid meshes
-        self.mesh_shape_seeds = self.rng.uniform(0.7, 1.3, size=(num_particles, 3))
-
-        # Particle state vectors
         self.positions = np.zeros((self.N, 3), dtype=np.float64)
         self.velocities = np.zeros((self.N, 3), dtype=np.float64)
-        self.accelerations = np.zeros((self.N, 3), dtype=np.float64)
-        self.tidal_vectors = np.zeros((self.N, 3), dtype=np.float64)
+        self.initial_energies = np.zeros(self.N, dtype=np.float64)
+        self.energy_perturbations = np.zeros(self.N, dtype=np.float64)
+        self.tidal_accelerations = np.zeros(self.N, dtype=np.float64)
+        
+        self._generate_ring()
 
-        # Cohesive bond network
-        self.bonds_i = np.array([], dtype=np.int32)
-        self.bonds_j = np.array([], dtype=np.int32)
-        self.bonds_d0 = np.array([], dtype=np.float64)
-        self.bonds_active = np.array([], dtype=bool)
+    def _generate_ring(self):
+        # Generate multi-band radial density distribution
+        u = self.rng.uniform(0.0, 1.0, self.N)
+        radii = self.r_inner + (self.r_outer - self.r_inner) * np.sqrt(u)
+        
+        # Add subtle ringlet gap variations
+        ringlet_mask = (radii > 9.0) & (radii < 9.6)
+        radii[ringlet_mask] += self.rng.uniform(-0.4, 0.4, np.sum(ringlet_mask))
+        
+        angles = self.rng.uniform(0.0, 2.0 * np.pi, self.N)
+        z_offsets = self.rng.normal(0.0, self.thickness, self.N)
 
-        self.primary_fragment_idx = int(np.argmax(self.masses))
-        self._generate_moon()
+        self.positions[:, 0] = radii * np.cos(angles)
+        self.positions[:, 1] = radii * np.sin(angles)
+        self.positions[:, 2] = z_offsets
 
-    def _generate_moon(self):
-        local_pos = []
-        target_count = self.N
-
-        golden_ratio = (1.0 + 5.0 ** 0.5) / 2.0
-        for i in range(target_count):
-            theta = 2.0 * np.pi * i / golden_ratio
-            phi = np.arccos(1.0 - 2.0 * (i + 0.5) / target_count)
-            u = self.rng.uniform(0.1, 1.0)
-            r = self.radius * (u ** (1.0 / 3.0))
-
-            x = r * np.sin(phi) * np.cos(theta)
-            y = r * np.sin(phi) * np.sin(theta)
-            z = r * np.cos(phi)
-            local_pos.append([x, y, z])
-
-        local_pos = np.array(local_pos, dtype=np.float64)
-        local_pos -= np.mean(local_pos, axis=0)
-
-        r0 = self.initial_r
-        v0 = np.sqrt(self.G * (self.host_mass + self.total_mass) / r0)
-        omega_orbit = v0 / r0
-
-        self.positions[:, 0] = r0 + local_pos[:, 0]
-        self.positions[:, 1] = local_pos[:, 1]
-        self.positions[:, 2] = local_pos[:, 2]
-
-        self.velocities[:, 0] = -omega_orbit * local_pos[:, 1]
-        self.velocities[:, 1] = v0 + omega_orbit * local_pos[:, 0]
+        # Circular Keplerian orbital velocities v = sqrt(G * M / r)
+        v_circ = np.sqrt(G_CONST * self.central_mass / radii)
+        self.velocities[:, 0] = -v_circ * np.sin(angles)
+        self.velocities[:, 1] = v_circ * np.cos(angles)
         self.velocities[:, 2] = 0.0
 
-        cutoff = 2.4 * (self.radius / (self.N ** (1.0 / 3.0)))
-        b_i, b_j, b_d0 = [], [], []
-
-        for i in range(self.N):
-            for j in range(i + 1, self.N):
-                dist = np.linalg.norm(local_pos[i] - local_pos[j])
-                if dist <= cutoff:
-                    b_i.append(i)
-                    b_j.append(j)
-                    b_d0.append(dist)
-
-        self.bonds_i = np.array(b_i, dtype=np.int32)
-        self.bonds_j = np.array(b_j, dtype=np.int32)
-        self.bonds_d0 = np.array(b_d0, dtype=np.float64)
-        self.bonds_active = np.ones(len(b_i), dtype=bool)
+        # Initial specific orbital energy E0 = - G M / (2 a)
+        self.initial_energies = - G_CONST * self.central_mass / (2.0 * radii)
 
 
-class SymplecticIntegrator:
+class SymplecticRingIntegrator:
     """
-    Second-order Symplectic Velocity Verlet integrator for N-body system.
-    Calculates dynamic differential tidal forces and tracks disruption events.
+    Second-Order Symplectic Velocity Verlet integrator for test-particle ring
+    under central black hole and moving stellar intruder gravity.
     """
     def __init__(
         self,
-        moon: RubblePileMoon,
-        host_mass: float = 1000.0,
-        host_radius: float = 2.0,
-        g_const: float = 1.0,
-        softening: float = 0.05
+        ring: CollisionlessTidalRing,
+        black_hole: CentralBlackHole,
+        intruder: StellarIntruder,
+        enable_gr: bool = True,
+        c_scale: float = 1000.0,
+        softening: float = 0.15
     ):
-        self.moon = moon
-        self.M_host = host_mass
-        self.R_host = host_radius
-        self.G = g_const
+        self.ring = ring
+        self.bh = black_hole
+        self.intruder = intruder
+        self.enable_gr = enable_gr
+        self.c_scale = c_scale
         self.softening = softening
-        self.decay_rate = 0.0
+        self.time = 0.0
 
-        self.particle_stresses = np.zeros(self.moon.N, dtype=np.float64)
-        self.disruption_flash_trigger = False
-        self.has_flashed_disruption = False
+        self.accelerations = self._compute_accelerations(
+            self.ring.positions,
+            self.ring.velocities,
+            self.intruder.position
+        )
 
-        self.moon.accelerations = self._compute_accelerations(self.moon.positions, self.moon.velocities)
-        self.initial_energy = self.compute_total_energy()
+    def _compute_intruder_acceleration(self, pos_intruder: np.ndarray, pos_bh: np.ndarray) -> np.ndarray:
+        r_vec = pos_intruder - pos_bh
+        r = np.linalg.norm(r_vec)
+        r_clamped = max(0.1, r)
+        return - (G_CONST * self.bh.mass / (r_clamped ** 3)) * r_vec
 
-    def set_decay_rate(self, rate: float):
-        self.decay_rate = rate
+    def _compute_accelerations(self, pos: np.ndarray, vel: np.ndarray, pos_intruder: np.ndarray) -> np.ndarray:
+        # 1. Central Black Hole Newtonian Gravity
+        r_sq = np.sum(pos ** 2, axis=1, keepdims=True)
+        r_norms = np.sqrt(r_sq)
+        r_clamped = np.maximum(r_norms, 0.1)
+        
+        acc = - (G_CONST * self.bh.mass / (r_clamped ** 3)) * pos
 
-    def set_cohesion_k(self, k_val: float):
-        self.moon.k_spring = max(0.0, float(k_val))
+        # 2. Stellar Intruder Gravity (Softened)
+        diff_int = pos - pos_intruder  # (N, 3)
+        dist_int_sq = np.sum(diff_int ** 2, axis=1, keepdims=True) + (self.softening ** 2)
+        dist_int_cube = dist_int_sq ** 1.5
+        acc_int = - (G_CONST * self.intruder.mass / dist_int_cube) * diff_int
+        acc += acc_int
 
-    def _compute_accelerations(self, pos: np.ndarray, vel: np.ndarray) -> np.ndarray:
-        N = self.moon.N
-        acc = np.zeros((N, 3), dtype=np.float64)
-        self.particle_stresses.fill(0.0)
+        # Track tidal acceleration magnitude near intruder
+        self.ring.tidal_accelerations = np.linalg.norm(acc_int, axis=1)
 
-        # 1. Host Planet Central Gravity
-        r_norms = np.linalg.norm(pos, axis=1, keepdims=True)
-        r_norms_clamped = np.maximum(r_norms, 0.1)
-        acc_host = - (self.G * self.M_host / (r_norms_clamped ** 3)) * pos
-        acc += acc_host
-
-        # Differential Tidal Gravity Vector: Delta_F_tidal_i = F_host_i - F_host_COM
-        com = np.mean(pos, axis=0)
-        r_com_norm = max(0.1, np.linalg.norm(com))
-        acc_host_com = - (self.G * self.M_host / (r_com_norm ** 3)) * com
-        self.moon.tidal_vectors = (acc_host - acc_host_com) * self.moon.masses[:, np.newaxis]
-
-        # 2. Mutual N-body Newtonian Gravity with Softening
-        diff = pos[:, np.newaxis, :] - pos[np.newaxis, :, :]  # (N, N, 3)
-        dist_sq = np.sum(diff ** 2, axis=-1) + (self.softening ** 2)  # (N, N)
-        inv_dist_cube = dist_sq ** (-1.5)
-        np.fill_diagonal(inv_dist_cube, 0.0)
-
-        mass_matrix = self.moon.masses[np.newaxis, :]
-        acc_grav = - self.G * np.sum(diff * (inv_dist_cube * mass_matrix)[:, :, np.newaxis], axis=1)
-        acc += acc_grav
-
-        # 3. Cohesive Spring Forces & Tensile Fracture
-        if len(self.moon.bonds_i) > 0 and np.any(self.moon.bonds_active) and self.moon.k_spring > 0.0:
-            active_idx = np.where(self.moon.bonds_active)[0]
-            idx_i = self.moon.bonds_i[active_idx]
-            idx_j = self.moon.bonds_j[active_idx]
-            d0 = self.moon.bonds_d0[active_idx]
-
-            r_ij = pos[idx_i] - pos[idx_j]
-            dist = np.linalg.norm(r_ij, axis=1)
-            dist_clamped = np.maximum(dist, 1e-6)
-
-            strain = (dist - d0) / d0
-            broken_mask = strain > self.moon.strain_limit
-            if np.any(broken_mask):
-                self.moon.bonds_active[active_idx[broken_mask]] = False
-                active_idx = np.where(self.moon.bonds_active)[0]
-                idx_i = self.moon.bonds_i[active_idx]
-                idx_j = self.moon.bonds_j[active_idx]
-                d0 = self.moon.bonds_d0[active_idx]
-                r_ij = pos[idx_i] - pos[idx_j]
-                dist = np.linalg.norm(r_ij, axis=1)
-                dist_clamped = np.maximum(dist, 1e-6)
-
-            if len(active_idx) > 0:
-                hat_r = r_ij / dist_clamped[:, np.newaxis]
-                delta_d = dist - d0
-
-                m_i = self.moon.masses[idx_i]
-                m_j = self.moon.masses[idx_j]
-                mu_ij = (m_i * m_j) / (m_i + m_j)
-                mu_scale = mu_ij / (0.5 * self.moon.m_mean)
-                k_eff = self.moon.k_spring * mu_scale
-
-                f_spring = - k_eff[:, np.newaxis] * delta_d[:, np.newaxis] * hat_r
-
-                v_ij = vel[idx_i] - vel[idx_j]
-                v_rel_proj = np.sum(v_ij * hat_r, axis=1, keepdims=True)
-                f_damping = - self.moon.spring_damping * mu_scale[:, np.newaxis] * v_rel_proj * hat_r
-
-                f_total_bond = f_spring + f_damping
-
-                a_bond_i = f_total_bond / m_i[:, np.newaxis]
-                a_bond_j = f_total_bond / m_j[:, np.newaxis]
-
-                np.add.at(acc, idx_i, a_bond_i)
-                np.subtract.at(acc, idx_j, a_bond_j)
-
-                tensile_load = np.maximum(0.0, delta_d * k_eff)
-                np.add.at(self.particle_stresses, idx_i, tensile_load)
-                np.add.at(self.particle_stresses, idx_j, tensile_load)
-
-        # 4. Orbital Decay Drag Force
-        if self.decay_rate > 0.0:
-            acc_drag = - self.decay_rate * vel
-            acc += acc_drag
+        # 3. Weak-Field 1PN General Relativistic Schwarzschild Precession (Optional)
+        if self.enable_gr:
+            L_vecs = np.cross(pos, vel)  # (N, 3)
+            L_sq = np.sum(L_vecs ** 2, axis=1, keepdims=True)  # (N, 1)
+            c_effective = self.c_scale
+            acc_1pn = - (3.0 * G_CONST * self.bh.mass * L_sq / ((c_effective ** 2) * (r_clamped ** 5))) * pos
+            acc += acc_1pn
 
         return acc
 
     def step(self, dt: float):
-        pos = self.moon.positions
-        vel = self.moon.velocities
-        acc = self.moon.accelerations
+        pos = self.ring.positions
+        vel = self.ring.velocities
+        acc = self.accelerations
 
+        # 1. Intruder step (Velocity Verlet)
+        acc_int = self._compute_intruder_acceleration(self.intruder.position, self.bh.position)
+        self.intruder.position += self.intruder.velocity * dt + 0.5 * acc_int * (dt ** 2)
+        vel_int_half = self.intruder.velocity + 0.5 * acc_int * dt
+        acc_int_new = self._compute_intruder_acceleration(self.intruder.position, self.bh.position)
+        self.intruder.velocity = vel_int_half + 0.5 * acc_int_new * dt
+
+        # 2. Ring particle step (Symplectic Velocity Verlet)
         pos += vel * dt + 0.5 * acc * (dt ** 2)
         vel_half = vel + 0.5 * acc * dt
-        acc_new = self._compute_accelerations(pos, vel_half)
+
+        acc_new = self._compute_accelerations(pos, vel_half, self.intruder.position)
+
         vel[:] = vel_half + 0.5 * acc_new * dt
         acc[:] = acc_new
 
-        # Check Roche disruption screen flash event trigger
-        r_com = np.linalg.norm(np.mean(pos, axis=0))
-        roche = self.compute_roche_limit()
-        if r_com < roche and not self.has_flashed_disruption:
-            self.disruption_flash_trigger = True
-            self.has_flashed_disruption = True
-        else:
-            self.disruption_flash_trigger = False
+        self.time += dt
+        self._update_telemetry()
 
-    def compute_total_energy(self) -> float:
-        pos = self.moon.positions
-        vel = self.moon.velocities
-        m = self.moon.masses
-
-        ke = 0.5 * np.sum(m[:, np.newaxis] * (vel ** 2))
-
+    def _update_telemetry(self):
+        # Compute specific orbital energy E = 0.5 * v^2 - G * M_BH / r
+        pos = self.ring.positions
+        vel = self.ring.velocities
         r_norms = np.linalg.norm(pos, axis=1)
-        u_host = - np.sum(self.G * self.M_host * m / r_norms)
-
-        diff = pos[:, np.newaxis, :] - pos[np.newaxis, :, :]
-        dist = np.sqrt(np.sum(diff ** 2, axis=-1) + self.softening ** 2)
-        np.fill_diagonal(dist, 1.0)
-        m_outer = m[:, np.newaxis] * m[np.newaxis, :]
-        u_mutual = - 0.5 * self.G * np.sum(m_outer / dist)
-
-        u_spring = 0.0
-        if len(self.moon.bonds_i) > 0 and np.any(self.moon.bonds_active) and self.moon.k_spring > 0.0:
-            active_idx = np.where(self.moon.bonds_active)[0]
-            if len(active_idx) > 0:
-                idx_i = self.moon.bonds_i[active_idx]
-                idx_j = self.moon.bonds_j[active_idx]
-                d0 = self.moon.bonds_d0[active_idx]
-                dist = np.linalg.norm(pos[idx_i] - pos[idx_j], axis=1)
-
-                m_i = self.moon.masses[idx_i]
-                m_j = self.moon.masses[idx_j]
-                mu_ij = (m_i * m_j) / (m_i + m_j)
-                mu_scale = mu_ij / (0.5 * self.moon.m_mean)
-                k_eff = self.moon.k_spring * mu_scale
-                u_spring = 0.5 * np.sum(k_eff * ((dist - d0) ** 2))
-
-        return ke + u_host + u_mutual + u_spring
-
-    def compute_roche_limit(self) -> float:
-        v_host = (4.0 / 3.0) * np.pi * (self.R_host ** 3)
-        rho_host = self.M_host / v_host
-
-        v_moon = (4.0 / 3.0) * np.pi * (self.moon.radius ** 3)
-        rho_moon = self.moon.total_mass / v_moon
-
-        return 2.44 * self.R_host * ((rho_host / rho_moon) ** (1.0 / 3.0))
+        current_energies = 0.5 * np.sum(vel ** 2, axis=1) - G_CONST * self.bh.mass / r_norms
+        
+        # Energy perturbation ratio |E - E0| / |E0|
+        self.ring.energy_perturbations = np.abs(current_energies - self.ring.initial_energies) / np.abs(self.ring.initial_energies)
 
     def get_telemetry(self) -> dict:
-        com = np.mean(self.moon.positions, axis=0)
-        com_vel = np.mean(self.moon.velocities, axis=0)
-        r_com = np.linalg.norm(com)
-        v_com = np.linalg.norm(com_vel)
-
-        roche_limit = self.compute_roche_limit()
-        delta_a_tidal = (2.0 * self.G * self.M_host * self.moon.radius) / max(0.1, r_com ** 3)
-
-        current_energy = self.compute_total_energy()
-        energy_drift = abs(current_energy - self.initial_energy) / max(1e-8, abs(self.initial_energy))
-
-        active_bonds_count = int(np.sum(self.moon.bonds_active))
-        total_bonds_count = len(self.moon.bonds_active)
-
-        primary_pos = self.moon.positions[self.moon.primary_fragment_idx]
-
-        # Find debris stream center (mean of active or sheared debris)
-        debris_center = np.mean(self.moon.positions, axis=0)
-
+        intruder_dist = np.linalg.norm(self.intruder.position)
+        perturbed_count = int(np.sum(self.ring.energy_perturbations > 0.08))
+        max_tidal_acc = float(np.max(self.ring.tidal_accelerations))
+        
         return {
-            "orbital_radius": r_com,
-            "orbital_speed": v_com,
-            "roche_limit": roche_limit,
-            "tidal_differential": delta_a_tidal,
-            "total_energy": current_energy,
-            "energy_drift": energy_drift,
-            "active_bonds": active_bonds_count,
-            "total_bonds": total_bonds_count,
-            "is_disrupted": r_com < roche_limit or active_bonds_count < 0.2 * total_bonds_count,
-            "com_pos": com,
-            "primary_pos": primary_pos,
-            "debris_center": debris_center,
-            "flash_trigger": self.disruption_flash_trigger
+            "simulation_time": self.time,
+            "particle_count": self.ring.N,
+            "black_hole_mass": self.bh.mass,
+            "intruder_mass": self.intruder.mass,
+            "intruder_distance": intruder_dist,
+            "max_tidal_acc": max_tidal_acc,
+            "perturbed_particles": perturbed_count,
+            "gr_enabled": self.enable_gr,
+            "intruder_pos": self.intruder.position.copy(),
+            "intruder_vel": self.intruder.velocity.copy()
         }
