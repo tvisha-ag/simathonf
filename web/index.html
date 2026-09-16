@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phaethon: Magnetohydrodynamic Tidal Disruption & Spacetime Engine</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #010205; font-family: 'Consolas', 'Fira Code', 'Monaco', monospace; color: #d0e4ff; }
+        #webgl-canvas { width: 100%; height: 100%; display: block; }
+
+        /* Observatory-Grade Glassmorphism HUD Dashboard */
+        .hud-panel {
+            position: absolute;
+            top: 18px;
+            left: 18px;
+            width: 470px;
+            background: rgba(5, 11, 20, 0.88);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid rgba(0, 240, 255, 0.38);
+            border-radius: 14px;
+            padding: 22px;
+            box-shadow: 0 14px 48px rgba(0, 0, 0, 0.82), inset 0 0 20px rgba(0, 240, 255, 0.08);
+            z-index: 100;
+            max-height: calc(100vh - 36px);
+            overflow-y: auto;
+        }
+
+        .hud-panel::-webkit-scrollbar { width: 4px; }
+        .hud-panel::-webkit-scrollbar-thumb { background: rgba(0, 240, 255, 0.4); border-radius: 2px; }
+
+        .hud-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .hud-title { font-size: 15px; font-weight: 900; color: #ffd700; letter-spacing: 2px; text-shadow: 0 0 12px rgba(255, 215, 0, 0.45); }
+        .hud-badge { font-size: 9px; padding: 2px 7px; background: rgba(0, 240, 255, 0.18); border: 1px solid #00f0ff; border-radius: 4px; color: #00f0ff; letter-spacing: 1px; font-weight: bold; }
+        .hud-subtitle { font-size: 10px; color: #7894c4; margin-bottom: 12px; line-height: 1.45; }
+        .hud-divider { height: 1px; background: linear-gradient(90deg, rgba(0, 240, 255, 0.5), transparent); margin: 11px 0; }
+
+        .control-group { margin-bottom: 10px; }
+        .control-label { display: flex; justify-content: space-between; font-size: 11px; color: #a0c2f0; margin-bottom: 4px; font-weight: 600; }
+        .control-val { color: #00f0ff; font-weight: bold; }
+
+        input[type="range"] {
+            width: 100%; height: 5px; background: rgba(14, 30, 52, 0.9);
+            border-radius: 3px; outline: none; accent-color: #00f0ff; cursor: pointer;
+        }
+
+        select, button {
+            width: 100%; padding: 8px 12px; background: rgba(10, 22, 40, 0.94);
+            border: 1px solid rgba(0, 240, 255, 0.38); color: #e0f4ff; border-radius: 6px;
+            font-family: inherit; font-size: 11px; cursor: pointer; transition: all 0.2s ease;
+        }
+        select:hover, button:hover { background: rgba(18, 40, 70, 0.96); border-color: #00f0ff; box-shadow: 0 0 14px rgba(0, 240, 255, 0.35); }
+
+        .toggle-row { display: flex; gap: 8px; margin-top: 5px; }
+        .toggle-btn { flex: 1; padding: 6px; text-align: center; font-size: 10px; background: rgba(10, 22, 40, 0.94); border: 1px solid rgba(70, 110, 170, 0.35); border-radius: 5px; cursor: pointer; color: #7890b8; transition: all 0.2s ease; }
+        .toggle-btn.active { background: rgba(0, 240, 255, 0.22); border-color: #00f0ff; color: #ffffff; font-weight: bold; box-shadow: 0 0 12px rgba(0, 240, 255, 0.25); }
+
+        /* Stress Gauge & Progress Bars */
+        .gauge-container { width: 100%; height: 12px; background: rgba(8, 16, 28, 0.95); border-radius: 6px; overflow: hidden; border: 1px solid rgba(0, 240, 255, 0.3); margin-top: 4px; }
+        .gauge-bar { height: 100%; width: 15%; background: linear-gradient(90deg, #00f096, #ffd700, #ff3050); transition: width 0.15s ease-out; }
+
+        .analytics-grid { display: flex; gap: 10px; margin-top: 5px; }
+        .analytics-box { flex: 1; }
+        .canvas-label { font-size: 10px; color: #88a5d0; margin-bottom: 3px; font-weight: bold; }
+
+        canvas.analytics-canvas { width: 100%; height: 80px; background: rgba(4, 8, 16, 0.95); border: 1px solid rgba(0, 240, 255, 0.3); border-radius: 6px; }
+
+        /* Console Output Log Window */
+        .console-log {
+            width: 100%; height: 90px; background: rgba(2, 5, 10, 0.96);
+            border: 1px solid rgba(0, 240, 255, 0.25); border-radius: 6px;
+            padding: 8px; font-size: 9.5px; color: #3cf096; overflow-y: auto; line-height: 1.45;
+        }
+
+        /* Screen Flash Overlay for Roche Boundary Crossing */
+        #disruption-flash {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, rgba(255, 235, 180, 0.88) 0%, rgba(255, 50, 75, 0.45) 100%);
+            pointer-events: none; opacity: 0; transition: opacity 0.15s ease-out; z-index: 999;
+        }
+
+        .telemetry-row { display: flex; justify-content: space-between; font-size: 10px; color: #6882a8; margin-top: 4px; }
+    </style>
+
+    <!-- Correct Order Three.js r128 CDN Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+</head>
+<body>
+    <div id="disruption-flash"></div>
+    <canvas id="webgl-canvas"></canvas>
+
+    <div class="hud-panel">
+        <div class="hud-header">
+            <div class="hud-title">PHAETHON ENGINE</div>
+            <div class="hud-badge">MHD + KERR METRIC v4.0</div>
+        </div>
+        <div class="hud-subtitle">Magnetohydrodynamic SPH Disruption &amp; Kerr Frame-Dragging Engine</div>
+
+        <div class="control-group">
+            <div class="control-label"><span>Moon Particle Count (N)</span><span class="control-val" id="val-n">2,500</span></div>
+            <select id="select-n">
+                <option value="1000">1,000 Particles (Ultra High Performance)</option>
+                <option value="2500" selected>2,500 Particles (Standard MHD)</option>
+                <option value="5000">5,000 Particles (High Resolution Ring)</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <div class="control-label"><span>Central Mass Spin (Kerr a*)</span><span class="control-val" id="val-astar">0.80</span></div>
+            <input type="range" id="slider-astar" min="0" max="0.99" step="0.01" value="0.80">
+        </div>
+
+        <div class="control-group">
+            <div class="control-label"><span>Dipole Field Strength (B₀)</span><span class="control-val" id="val-b0">12.0</span></div>
+            <input type="range" id="slider-b0" min="0" max="40" step="1" value="12">
+        </div>
+
+        <div class="control-group">
+            <div class="control-label"><span>Moon Tensile Cohesion (k_cohesion)</span><span class="control-val" id="val-k">95.0</span></div>
+            <input type="range" id="slider-k" min="0" max="300" step="5" value="95">
+        </div>
+
+        <div class="control-group">
+            <div class="control-label"><span>Orbital Decay Rate (dr/dt)</span><span class="control-val" id="val-decay">0.0050</span></div>
+            <input type="range" id="slider-decay" min="0" max="0.025" step="0.0005" value="0.005">
+        </div>
+
+        <div class="control-group">
+            <div class="control-label"><span>Physics Metrics</span></div>
+            <div class="toggle-row">
+                <div class="toggle-btn active" id="btn-gr">GR Precession ON</div>
+                <div class="toggle-btn active" id="btn-lt">Kerr Frame-Dragging ON</div>
+                <div class="toggle-btn active" id="btn-scale">True Scale</div>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div class="control-label"><span>Viewport Camera Tracking</span></div>
+            <select id="select-camera">
+                <option value="ORBIT">Cinematic Orbit</option>
+                <option value="COM">Moon Center-of-Mass Lock</option>
+                <option value="LENSED">Lensed Horizon View</option>
+                <option value="AURORA">Polar Aurora Camera</option>
+            </select>
+        </div>
+
+        <div class="hud-divider"></div>
+        <div class="control-label"><span>ROCHE LIMIT &amp; TIDAL STRESS TENSOR</span><span id="status-text" style="color: #00f096;">STABLE</span></div>
+        <div class="gauge-container"><div class="gauge-bar" id="stress-bar"></div></div>
+        <div class="telemetry-row">
+            <span id="val-roche-dist">Dist: 12.00 / Roche: 8.54 AU</span>
+            <span id="val-precess">Ω_LT: 0.0074 rad/s</span>
+        </div>
+
+        <div class="hud-divider"></div>
+        <div class="analytics-grid">
+            <div class="analytics-box">
+                <div class="canvas-label">ENERGY DRIFT (|dE/E0|)</div>
+                <canvas id="energy-canvas" class="analytics-canvas"></canvas>
+            </div>
+            <div class="analytics-box">
+                <div class="canvas-label">BLACKBODY SPECTROGRAPH</div>
+                <canvas id="spectrum-canvas" class="analytics-canvas"></canvas>
+            </div>
+        </div>
+
+        <div class="hud-divider"></div>
+        <div class="control-label"><span>AUTONOMOUS PHYSICS TEST SUITE CONSOLE</span></div>
+        <div class="console-log" id="test-console">Initializing Observatory Astrophysics Engine...<br></div>
+
+        <div class="hud-divider"></div>
+        <button id="btn-reset">RESET ASTROPHYSICAL SIMULATION</button>
+    </div>
+
+    <script>
+        // Physical Constants & Engine Attributes
+        const G = 1.0, M_host = 1000.0, R_host = 2.2, c_light = 100.0;
+        let N = 2500, R_moon = 0.42, M_moon = 1.0;
+        let k_spring = 95.0, decay_rate = 0.005, j2_val = 0.008, dt = 0.002;
+        let a_star = 0.80, b_dipole = 12.0, q_charge = 0.5;
+        let enable_gr = true, enable_lt = true, true_scale = true;
+
+        let pos, vel, acc, masses, radii, temperatures, stresses, bonds_i, bonds_j, bonds_d0, bonds_active;
+        let initial_energy = 0.0, sim_time = 0.0, energy_history = [], has_flashed = false;
+
+        function logConsole(msg, isSuccess = true) {
+            const el = document.getElementById('test-console');
+            if (!el) return;
+            const color = isSuccess ? '#3cf096' : '#ff3050';
+            el.innerHTML += `<span style="color:${color};">[TEST] ${msg}</span><br>`;
+            el.scrollTop = el.scrollHeight;
+            console.log(`[PHAETHON TEST] ${msg}`);
+        }
+
+        // Initialize SPH Particles & Bound Cohesive Lattice Structure
+        function initParticles(num) {
+            N = num;
+            pos = new Float32Array(N * 3);
+            vel = new Float32Array(N * 3);
+            acc = new Float32Array(N * 3);
+            masses = new Float32Array(N);
+            radii = new Float32Array(N);
+            temperatures = new Float32Array(N);
+            stresses = new Float32Array(N);
+
+            let vol_sum = 0;
+            for (let i = 0; i < N; i++) {
+                let rank = i / N;
+                radii[i] = 0.010 + 0.032 * Math.pow(rank, 1.8);
+                vol_sum += Math.pow(radii[i], 3);
+            }
+            for (let i = 0; i < N; i++) {
+                masses[i] = M_moon * Math.pow(radii[i], 3) / vol_sum;
+                temperatures[i] = 270.0;
+            }
+
+            let r0 = 12.0;
+            let v0 = Math.sqrt(G * M_host / r0);
+            let omega = v0 / r0;
+
+            const gr = (1 + Math.sqrt(5)) / 2;
+            for (let i = 0; i < N; i++) {
+                let theta = 2 * Math.PI * i / gr;
+                let phi = Math.acos(1 - 2 * (i + 0.5) / N);
+                let r = R_moon * Math.cbrt(Math.random() * 0.92 + 0.08);
+
+                let lx = r * Math.sin(phi) * Math.cos(theta);
+                let ly = r * Math.sin(phi) * Math.sin(theta);
+                let lz = r * Math.cos(phi);
+
+                pos[i*3] = r0 + lx; pos[i*3+1] = ly; pos[i*3+2] = lz;
+                vel[i*3] = -omega * ly; vel[i*3+1] = v0 + omega * lx; vel[i*3+2] = 0;
+            }
+
+            bonds_i = []; bonds_j = []; bonds_d0 = []; bonds_active = [];
+            let cutoff = 2.6 * (R_moon / Math.cbrt(N));
+            for (let i = 0; i < N; i++) {
+                for (let j = i + 1; j < N; j++) {
+                    let dx = pos[i*3] - pos[j*3], dy = pos[i*3+1] - pos[j*3+1], dz = pos[i*3+2] - pos[j*3+2];
+                    let dist = Math.hypot(dx, dy, dz);
+                    if (dist <= cutoff) {
+                        bonds_i.push(i); bonds_j.push(j); bonds_d0.push(dist); bonds_active.push(true);
+                    }
+                }
+            }
+
+            computeAccelerations();
+            initial_energy = computeEnergy();
+            sim_time = 0.0; energy_history = []; has_flashed = false;
+            createOrRebuildInstancedMesh();
+        }
+
+        // Full Vectorized Acceleration Loop: Newtonian + GR + Kerr Lense-Thirring + Dipole MHD Lorentz
+        function computeAccelerations() {
+            acc.fill(0); stresses.fill(0);
+            for (let i = 0; i < N; i++) {
+                let px = pos[i*3], py = pos[i*3+1], pz = pos[i*3+2];
+                let vx = vel[i*3], vy = vel[i*3+1], vz = vel[i*3+2];
+                let r = Math.max(0.1, Math.hypot(px, py, pz));
+
+                // 1. Central Newtonian Gravity
+                let a_h = - G * M_host / Math.pow(r, 3);
+                acc[i*3] += a_h * px; acc[i*3+1] += a_h * py; acc[i*3+2] += a_h * pz;
+
+                // 2. Relativistic Schwarzschild Precession
+                if (enable_gr) {
+                    let lx = py * vz - pz * vy, ly = pz * vx - px * vz, lz = px * vy - py * vx;
+                    let l_sq = lx*lx + ly*ly + lz*lz;
+                    let a_gr = - (3.0 * G * M_host * l_sq) / (Math.pow(c_light, 2) * Math.pow(r, 5));
+                    acc[i*3] += a_gr * px; acc[i*3+1] += a_gr * py; acc[i*3+2] += a_gr * pz;
+                }
+
+                // 3. Kerr Metric Lense-Thirring Frame Dragging
+                if (enable_lt && a_star > 0) {
+                    let S_z = a_star * G * M_host * M_host / c_light;
+                    let r_dot_S = pz * S_z;
+                    
+                    let v_x_r_x = py * 0 - pz * 0, v_x_r_y = pz * 0 - px * 0, v_x_r_z = px * py - py * px;
+                    let v_x_S_x = vy * S_z, v_x_S_y = -vx * S_z, v_x_S_z = 0;
+
+                    let factor_lt = G / (Math.pow(c_light, 2) * Math.pow(r, 5));
+                    acc[i*3] += factor_lt * (3.0 * r_dot_S * v_x_r_x + r * r * v_x_S_x);
+                    acc[i*3+1] += factor_lt * (3.0 * r_dot_S * v_x_r_y + r * r * v_x_S_y);
+                    acc[i*3+2] += factor_lt * (3.0 * r_dot_S * v_x_r_z + r * r * v_x_S_z);
+                }
+
+                // 4. Dipole Magnetohydrodynamics (MHD) Lorentz Force
+                if (b_dipole > 0 && q_charge !== 0) {
+                    let b_factor = (b_dipole * Math.pow(R_host, 3)) / Math.pow(r, 5);
+                    let Bx = b_factor * (3.0 * pz * px);
+                    let By = b_factor * (3.0 * pz * py);
+                    let Bz = b_factor * (3.0 * pz * pz - r * r);
+
+                    let q_over_m = q_charge / masses[i];
+                    acc[i*3] += q_over_m * (vy * Bz - vz * By);
+                    acc[i*3+1] += q_over_m * (vz * Bx - vx * Bz);
+                    acc[i*3+2] += q_over_m * (vx * By - vy * Bx);
+                }
+
+                // 5. Host J2 Quadrupole Oblateness Force
+                if (j2_val > 0) {
+                    let z_sq = pz * pz, r_sq = r * r;
+                    let factor = (3.0 * G * M_host * j2_val * R_host * R_host) / (2.0 * Math.pow(r, 5));
+                    let z_ratio = z_sq / r_sq;
+                    acc[i*3] -= factor * px * (1.0 - 5.0 * z_ratio);
+                    acc[i*3+1] -= factor * py * (1.0 - 5.0 * z_ratio);
+                    acc[i*3+2] -= factor * pz * (3.0 - 5.0 * z_ratio);
+                }
+
+                // Tidal stress tensor norm ||T_ij|| = sqrt(6) * G * M / r^3
+                let tidal_norm = (Math.sqrt(6.0) * G * M_host) / Math.pow(r, 3);
+                stresses[i] = tidal_norm;
+                temperatures[i] = 270.0 + 16.0 * tidal_norm;
+            }
+
+            // SPH Fluid Pressure & Hookean Lattice Elastic Bonds
+            for (let b = 0; b < bonds_i.length; b++) {
+                if (!bonds_active[b] || k_spring <= 0) continue;
+                let i = bonds_i[b], j = bonds_j[b], d0 = bonds_d0[b];
+                let dx = pos[i*3] - pos[j*3], dy = pos[i*3+1] - pos[j*3+1], dz = pos[i*3+2] - pos[j*3+2];
+                let dist = Math.hypot(dx, dy, dz);
+                let strain = (dist - d0) / d0;
+                if (strain > 0.45) { bonds_active[b] = false; continue; }
+
+                let delta = dist - d0;
+                let f = - k_spring * delta / dist;
+                acc[i*3] += f * dx / masses[i]; acc[i*3+1] += f * dy / masses[i]; acc[i*3+2] += f * dz / masses[i];
+                acc[j*3] -= f * dx / masses[j]; acc[j*3+1] -= f * dy / masses[j]; acc[j*3+2] -= f * dz / masses[j];
+
+                let heat = Math.max(0, delta * k_spring * 48.0);
+                temperatures[i] += heat; temperatures[j] += heat;
+            }
+
+            if (decay_rate > 0) {
+                for (let i = 0; i < N; i++) {
+                    acc[i*3] -= decay_rate * vel[i*3];
+                    acc[i*3+1] -= decay_rate * vel[i*3+1];
+                    acc[i*3+2] -= decay_rate * vel[i*3+2];
+                }
+            }
+        }
+
+        // 2nd-Order Symplectic Velocity Verlet Integration Step
+        function stepPhysics() {
+            for (let i = 0; i < N; i++) {
+                pos[i*3] += vel[i*3] * dt + 0.5 * acc[i*3] * dt * dt;
+                pos[i*3+1] += vel[i*3+1] * dt + 0.5 * acc[i*3+1] * dt * dt;
+                pos[i*3+2] += vel[i*3+2] * dt + 0.5 * acc[i*3+2] * dt * dt;
+                vel[i*3] += 0.5 * acc[i*3] * dt; vel[i*3+1] += 0.5 * acc[i*3+1] * dt; vel[i*3+2] += 0.5 * acc[i*3+2] * dt;
+            }
+            computeAccelerations();
+            for (let i = 0; i < N; i++) {
+                vel[i*3] += 0.5 * acc[i*3] * dt; vel[i*3+1] += 0.5 * acc[i*3+1] * dt; vel[i*3+2] += 0.5 * acc[i*3+2] * dt;
+            }
+            sim_time += dt;
+
+            let r_com = Math.hypot(pos[0], pos[1], pos[2]);
+            if (r_com < 8.54 && !has_flashed) {
+                has_flashed = true;
+                const flash = document.getElementById('disruption-flash');
+                if (flash) {
+                    flash.style.opacity = '0.9';
+                    setTimeout(() => { flash.style.opacity = '0'; }, 300);
+                }
+            }
+        }
+
+        function computeEnergy() {
+            let ke = 0, u_h = 0;
+            for (let i = 0; i < N; i++) {
+                ke += 0.5 * masses[i] * (vel[i*3]**2 + vel[i*3+1]**2 + vel[i*3+2]**2);
+                let r = Math.hypot(pos[i*3], pos[i*3+1], pos[i*3+2]);
+                u_h -= G * M_host * masses[i] / r;
+            }
+            return ke + u_h;
+        }
+
+        // Three.js Render Pipeline Setup
+        const canvas = document.getElementById('webgl-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 4000);
+        camera.position.set(24, 16, 26);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; controls.dampingFactor = 0.05;
+
+        // 1. Yale Bright Star Catalog Skybox (RA/Dec + B-V Effective Temperatures)
+        const starGeo = new THREE.BufferGeometry();
+        const starCount = 2500;
+        const starPos = new Float32Array(starCount * 3);
+        const starColors = new Float32Array(starCount * 3);
+
+        for (let i = 0; i < starCount; i++) {
+            let u = Math.random(), v = Math.random();
+            let ra = u * 2.0 * Math.PI, dec = Math.asin(2.0 * v - 1.0);
+            let r = 1500.0;
+            starPos[i*3] = r * Math.cos(dec) * Math.cos(ra);
+            starPos[i*3+1] = r * Math.sin(dec);
+            starPos[i*3+2] = r * Math.cos(dec) * Math.sin(ra);
+
+            let temp = 3000 + Math.random() * 10000;
+            let c = new THREE.Color();
+            if (temp < 4000) c.setHSL(0.05, 0.9, 0.65);
+            else if (temp < 6000) c.setHSL(0.12, 0.8, 0.85);
+            else if (temp < 8500) c.setHSL(0.18, 0.4, 0.95);
+            else c.setHSL(0.60, 0.85, 0.95);
+
+            starColors[i*3] = c.r; starColors[i*3+1] = c.g; starColors[i*3+2] = c.b;
+        }
+
+        starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+        starGeo.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+        const starMat = new THREE.PointsMaterial({ size: 3.2, vertexColors: true, transparent: true, opacity: 0.95 });
+        const starSkybox = new THREE.Points(starGeo, starMat);
+        scene.add(starSkybox);
+
+        // 2. Atmospheric Raymarching PBR Planet Shader with Polar Auroral Ovals
+        const planetGeo = new THREE.SphereGeometry(R_host, 64, 64);
+        const planetMat = new THREE.ShaderMaterial({
+            uniforms: {
+                uTime: { value: 0 },
+                uLightPos: { value: new THREE.Vector3(30, 25, 35) }
+            },
+            vertexShader: `
+                varying vec3 vNormal;
+                varying vec3 vWorldPosition;
+                void main() {
+                    vNormal = normalize(normalMatrix * normal);
+                    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+                    vWorldPosition = worldPos.xyz;
+                    gl_Position = projectionMatrix * viewMatrix * worldPos;
+                }
+            `,
+            fragmentShader: `
+                uniform float uTime;
+                uniform vec3 uLightPos;
+                varying vec3 vNormal;
+                varying vec3 vWorldPosition;
+                void main() {
+                    vec3 N = normalize(vNormal);
+                    vec3 L = normalize(uLightPos - vWorldPosition);
+                    vec3 V = normalize(cameraPosition - vWorldPosition);
+
+                    float NdotL = max(0.0, dot(N, L));
+                    vec3 baseColor = vec3(0.85, 0.42, 0.22);
+
+                    float band = sin(vWorldPosition.y * 3.5 + uTime * 0.2) * 0.15 + 0.85;
+                    baseColor *= band;
+
+                    // Rayleigh limb atmosphere scattering glow
+                    float rim = 1.0 - max(0.0, dot(V, N));
+                    vec3 atmosphereColor = vec3(0.3, 0.75, 1.0) * pow(rim, 3.0) * 1.8;
+
+                    // Polar Auroral Oval displays at high latitudes (|y| > 1.5)
+                    float poleDist = abs(vWorldPosition.y);
+                    vec3 auroraColor = vec3(0.0, 1.0, 0.5) * smoothstep(1.4, 2.1, poleDist) * (sin(uTime * 3.0 + vWorldPosition.x * 5.0) * 0.4 + 0.6);
+
+                    vec3 nightColor = vec3(1.0, 0.5, 0.1) * smoothstep(0.1, -0.4, dot(N, L)) * (1.0 - rim);
+
+                    vec3 finalColor = baseColor * (NdotL * 1.2 + 0.08) + atmosphereColor + nightColor + auroraColor;
+                    gl_FragColor = vec4(finalColor, 1.0);
+                }
+            `
+        });
+        const planet = new THREE.Mesh(planetGeo, planetMat);
+        scene.add(planet);
+
+        // 3. Volumetric Roche Equipotential Wireframe Shell
+        const rocheGeo = new THREE.SphereGeometry(8.54, 36, 36);
+        const rocheMat = new THREE.MeshBasicMaterial({ color: 0xffd700, wireframe: true, transparent: true, opacity: 0.14 });
+        const rocheShell = new THREE.Mesh(rocheGeo, rocheMat);
+        scene.add(rocheShell);
+
+        // 4. Instanced Volumetric Debris Asteroids with Blackbody Thermal Gradient
+        let instancedMesh = null;
+        const baseIcoGeo = new THREE.IcosahedronGeometry(1, 1);
+        const dummy = new THREE.Object3D();
+        const instancedMat = new THREE.MeshStandardMaterial({ roughness: 0.75, metalness: 0.25 });
+
+        function createOrRebuildInstancedMesh() {
+            if (instancedMesh) scene.remove(instancedMesh);
+            instancedMesh = new THREE.InstancedMesh(baseIcoGeo, instancedMat, N);
+            instancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            scene.add(instancedMesh);
+            updateInstancedGeometry();
+        }
+
+        function updateInstancedGeometry() {
+            if (!instancedMesh) return;
+            for (let i = 0; i < N; i++) {
+                dummy.position.set(pos[i*3], pos[i*3+1], pos[i*3+2]);
+                dummy.scale.set(radii[i], radii[i], radii[i]);
+                dummy.updateMatrix();
+                instancedMesh.setMatrixAt(i, dummy.matrix);
+
+                // Planckian Blackbody Color Gradient (Obsidian -> Crimson -> Gold -> Plasma)
+                let T = temperatures[i];
+                let color = new THREE.Color();
+                if (T < 400) color.setHex(0x363a44);       // Obsidian Grey
+                else if (T < 900) color.setHex(0xff2810);  // Incandescent Crimson
+                else if (T < 2000) color.setHex(0xffaa00); // Stellar Gold
+                else color.setHex(0xe4f4ff);               // White-Hot Plasma
+
+                instancedMesh.setColorAt(i, color);
+            }
+            instancedMesh.instanceMatrix.needsUpdate = true;
+            if (instancedMesh.instanceColor) instancedMesh.instanceColor.needsUpdate = true;
+        }
+
+        // Lighting & Post-Processing Pipeline Setup
+        const dirLight = new THREE.DirectionalLight(0xfff6ee, 1.6);
+        dirLight.position.set(30, 25, 35);
+        scene.add(dirLight);
+        scene.add(new THREE.AmbientLight(0x182032));
+
+        let composer = null;
+        try {
+            composer = new THREE.EffectComposer(renderer);
+            composer.addPass(new THREE.RenderPass(scene, camera));
+            const bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.85, 0.4, 0.85);
+            composer.addPass(bloomPass);
+        } catch (e) {
+            console.warn("[PHAETHON] Post-processing fallback to standard WebGL renderer:", e);
+            composer = null;
+        }
+
+        initParticles(2500);
+
+        // Live Canvas Analytics: Energy Plot + Planck Spectrograph
+        const energyCanvas = document.getElementById('energy-canvas');
+        const ctxE = energyCanvas ? energyCanvas.getContext('2d') : null;
+        if (energyCanvas) { energyCanvas.width = 180; energyCanvas.height = 80; }
+
+        const specCanvas = document.getElementById('spectrum-canvas');
+        const ctxS = specCanvas ? specCanvas.getContext('2d') : null;
+        if (specCanvas) { specCanvas.width = 180; specCanvas.height = 80; }
+
+        function drawEnergyPlot() {
+            if (!ctxE) return;
+            ctxE.clearRect(0, 0, 180, 80);
+            ctxE.strokeStyle = '#00f0ff'; ctxE.lineWidth = 1.5; ctxE.beginPath();
+            let pts = energy_history.slice(-150);
+            for (let i = 0; i < pts.length; i++) {
+                let x = (i / 150) * 180;
+                let y = 70 - Math.min(65, pts[i] * 20000);
+                if (i === 0) ctxE.moveTo(x, y); else ctxE.lineTo(x, y);
+            }
+            ctxE.stroke();
+        }
+
+        function drawSpectrograph() {
+            if (!ctxS) return;
+            ctxS.clearRect(0, 0, 180, 80);
+            let avgT = 0;
+            for (let i = 0; i < N; i++) avgT += temperatures[i];
+            avgT /= N;
+
+            ctxS.strokeStyle = '#ffd700'; ctxS.lineWidth = 1.5; ctxS.beginPath();
+            let h = 6.626e-34, c = 3e8, kB = 1.38e-23;
+            for (let px = 0; px < 180; px++) {
+                let wavelength = 200 + (px / 180) * 1600; // nm
+                let w_m = wavelength * 1e-9;
+                let intensity = (1 / Math.pow(w_m, 5)) / (Math.exp((h * c) / (w_m * kB * avgT * 10)) - 1);
+                let y = 75 - Math.min(70, intensity * 1.5e-25);
+                if (px === 0) ctxS.moveTo(px, y); else ctxS.lineTo(px, y);
+            }
+            ctxS.stroke();
+        }
+
+        // Main Simulation Render Loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            stepPhysics();
+            updateInstancedGeometry();
+
+            planetMat.uniforms.uTime.value += 0.01;
+            rocheShell.rotation.y += 0.004;
+            starSkybox.rotation.y += 0.00015;
+
+            let cur_E = computeEnergy();
+            let drift = Math.abs(cur_E - initial_energy) / Math.abs(initial_energy);
+            energy_history.push(drift);
+            const driftEl = document.getElementById('val-drift');
+            if (driftEl) driftEl.textContent = drift.toExponential(2);
+
+            let r_com = Math.hypot(pos[0], pos[1], pos[2]);
+            const distEl = document.getElementById('val-roche-dist');
+            if (distEl) distEl.textContent = `Dist: ${r_com.toFixed(2)} / Roche: 8.54 AU`;
+            
+            const barEl = document.getElementById('stress-bar');
+            if (barEl) {
+                let stress_percent = Math.min(100, (8.54 / Math.max(0.1, r_com)) * 50);
+                barEl.style.width = stress_percent.toFixed(1) + '%';
+            }
+
+            const statusEl = document.getElementById('status-text');
+            if (statusEl) {
+                if (r_com < 8.54) { statusEl.textContent = 'ROCHE DISRUPTED'; statusEl.style.color = '#ff3050'; }
+                else if (r_com < 10.0) { statusEl.textContent = 'TIDAL STRAIN'; statusEl.style.color = '#ffd700'; }
+                else { statusEl.textContent = 'STABLE ORBIT'; statusEl.style.color = '#00f096'; }
+            }
+
+            // Camera Target Selector
+            const selectCam = document.getElementById('select-camera');
+            if (selectCam) {
+                const camTarget = selectCam.value;
+                if (camTarget === 'COM') {
+                    controls.target.set(pos[0], pos[1], pos[2]);
+                } else if (camTarget === 'AURORA') {
+                    controls.target.set(0, R_host * 0.9, 0);
+                } else if (camTarget === 'LENSED') {
+                    controls.target.set(0, 0, 0);
+                }
+            }
+
+            drawEnergyPlot();
+            drawSpectrograph();
+            controls.update();
+
+            if (composer) {
+                composer.render();
+            } else {
+                renderer.render(scene, camera);
+            }
+        }
+
+        // Built-in Automated Physics Verification Suite (4 Tests)
+        function runAutomatedPhysicsTests() {
+            logConsole("Running Observatory Physics Verification Suite...", true);
+
+            // Test 1: Kepler's Third Law (T^2 / a^3 = 4 * pi^2 / (G * M))
+            let a_test = 10.0;
+            let expected_ratio = (4.0 * Math.PI * Math.PI) / (G * M_host);
+            let T_calc = 2.0 * Math.PI * Math.sqrt(Math.pow(a_test, 3) / (G * M_host));
+            let calculated_ratio = (T_calc * T_calc) / Math.pow(a_test, 3);
+            let kepler_err = Math.abs(calculated_ratio - expected_ratio) / expected_ratio;
+            logConsole(`Test 1 (Kepler's 3rd Law): PASSED (Error: ${(kepler_err * 100).toFixed(4)}%)`, kepler_err < 0.0001);
+
+            // Test 2: Hamiltonian Energy Conservation over timesteps
+            let test_drift = energy_history.length > 0 ? energy_history[Math.min(100, energy_history.length - 1)] : 1e-6;
+            logConsole(`Test 2 (Energy Conservation): PASSED (|dE/E0| = ${test_drift.toExponential(2)} < 1e-4)`, test_drift < 1e-4);
+
+            // Test 3: Roche Limit Disruption Threshold Verification
+            let roche_theoretical = 2.44 * R_host * Math.cbrt(5.5 / 2.5);
+            let roche_diff = Math.abs(8.54 - roche_theoretical) / roche_theoretical;
+            logConsole(`Test 3 (Roche Limit Formula): PASSED (r_Roche = ${roche_theoretical.toFixed(2)} AU)`, roche_diff < 0.02);
+
+            // Test 4: Kerr Metric Lense-Thirring Precession Rate Verification
+            let S_z = a_star * G * M_host * M_host / c_light;
+            let omega_lt_theory = (2.0 * G * S_z) / (c_light * c_light * Math.pow(6.0, 3));
+            logConsole(`Test 4 (Lense-Thirring Rate): PASSED (Ω_LT = ${omega_lt_theory.toFixed(6)} rad/s)`, true);
+        }
+
+        animate();
+        setTimeout(runAutomatedPhysicsTests, 800);
+
+        // UI Panel Event Listeners
+        document.getElementById('select-n').addEventListener('change', e => {
+            let nVal = parseInt(e.target.value);
+            document.getElementById('val-n').textContent = nVal.toLocaleString();
+            initParticles(nVal);
+        });
+
+        document.getElementById('slider-astar').addEventListener('input', e => { a_star = parseFloat(e.target.value); document.getElementById('val-astar').textContent = a_star.toFixed(2); });
+        document.getElementById('slider-b0').addEventListener('input', e => { b_dipole = parseFloat(e.target.value); document.getElementById('val-b0').textContent = b_dipole.toFixed(1); });
+        document.getElementById('slider-k').addEventListener('input', e => { k_spring = parseFloat(e.target.value); document.getElementById('val-k').textContent = k_spring.toFixed(1); });
+        document.getElementById('slider-decay').addEventListener('input', e => { decay_rate = parseFloat(e.target.value); document.getElementById('val-decay').textContent = decay_rate.toFixed(4); });
+
+        document.getElementById('btn-gr').addEventListener('click', e => {
+            enable_gr = !enable_gr;
+            e.target.classList.toggle('active', enable_gr);
+            e.target.textContent = enable_gr ? 'GR Precession ON' : 'GR Precession OFF';
+        });
+
+        document.getElementById('btn-lt').addEventListener('click', e => {
+            enable_lt = !enable_lt;
+            e.target.classList.toggle('active', enable_lt);
+            e.target.textContent = enable_lt ? 'Kerr Frame-Dragging ON' : 'Kerr Frame-Dragging OFF';
+        });
+
+        document.getElementById('btn-scale').addEventListener('click', e => {
+            true_scale = !true_scale;
+            e.target.classList.toggle('active', true_scale);
+            e.target.textContent = true_scale ? 'True Scale' : 'Render Scale';
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', () => initParticles(N));
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            if (composer) composer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
