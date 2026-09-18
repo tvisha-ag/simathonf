@@ -6,7 +6,7 @@
     <title>PHAETHON // RELATIVISTIC TIDAL RING OBSERVATORY</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background: #010308; font-family: 'Consolas', 'Fira Code', 'Monaco', monospace; color: #d0e4ff; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #000206; font-family: 'Consolas', 'Fira Code', 'Monaco', monospace; color: #d0e4ff; }
         #webgl-canvas { width: 100%; height: 100%; display: block; }
 
         /* NASA/JPL Observatory Top Header Bar */
@@ -16,16 +16,16 @@
             left: 0;
             width: 100%;
             height: 48px;
-            background: rgba(4, 9, 18, 0.92);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
+            background: rgba(3, 7, 14, 0.92);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
             border-bottom: 1px solid rgba(0, 240, 255, 0.25);
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 0 24px;
             z-index: 120;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
         }
 
         .header-title-box { display: flex; align-items: center; gap: 14px; }
@@ -44,7 +44,7 @@
             display: none;
             font-size: 9.5px;
             padding: 3px 10px;
-            background: rgba(255, 48, 80, 0.2);
+            background: rgba(255, 48, 80, 0.22);
             border: 1px solid #ff3050;
             color: #ff5570;
             border-radius: 4px;
@@ -54,7 +54,7 @@
         }
         @keyframes pulse-alert {
             0% { opacity: 0.6; box-shadow: 0 0 4px rgba(255, 48, 80, 0.3); }
-            100% { opacity: 1.0; box-shadow: 0 0 14px rgba(255, 48, 80, 0.8); }
+            100% { opacity: 1.0; box-shadow: 0 0 16px rgba(255, 48, 80, 0.9); }
         }
 
         /* 5-Stage Encounter Timeline Bar */
@@ -62,7 +62,7 @@
             display: flex;
             align-items: center;
             gap: 6px;
-            background: rgba(2, 6, 14, 0.8);
+            background: rgba(2, 6, 14, 0.85);
             border: 1px solid rgba(0, 240, 255, 0.2);
             border-radius: 6px;
             padding: 4px 10px;
@@ -81,7 +81,7 @@
             color: #ffffff;
             border: 1px solid #00f0ff;
             font-weight: bold;
-            box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.35);
         }
 
         /* NASA/JPL Telemetry Sidebar Panel (Left Side) */
@@ -90,13 +90,13 @@
             top: 60px;
             left: 16px;
             width: 370px;
-            background: rgba(4, 9, 18, 0.90);
+            background: rgba(3, 7, 14, 0.91);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border: 1px solid rgba(0, 240, 255, 0.25);
             border-radius: 10px;
             padding: 16px;
-            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.85);
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.9);
             z-index: 100;
             max-height: calc(100vh - 76px);
             overflow-y: auto;
@@ -201,8 +201,8 @@
             <div class="control-label"><span>PARTICLE FIELD RESOLUTION</span></div>
             <select id="select-n">
                 <option value="5000">5,000 Particles (Standard)</option>
-                <option value="10000" selected>10,000 Particles (High Density)</option>
-                <option value="20000">20,000 Particles (Ultra High Res)</option>
+                <option value="15000" selected>15,000 Particles (High Density TDE)</option>
+                <option value="25000">25,000 Particles (Ultra High Res)</option>
             </select>
         </div>
 
@@ -227,7 +227,7 @@
 
         <div class="control-label">
             <span>PERTURBED PARTICLES (|ΔE/E0| &gt; 0.08)</span>
-            <span id="val-perturbed-count" style="color: #00f0ff; font-weight: bold;">0 / 10,000</span>
+            <span id="val-perturbed-count" style="color: #00f0ff; font-weight: bold;">0 / 15,000</span>
         </div>
         <div class="gauge-container"><div class="gauge-bar" id="perturbed-bar"></div></div>
 
@@ -274,7 +274,7 @@
         const THICKNESS = 0.05; // Thin disk-like ring vertical dispersion
         const C_EFFECTIVE = 1000.0;
 
-        let N = 10000;
+        let N = 15000;
         let dt = 0.002;
         let sim_speed = 1.0;
         let is_paused = false;
@@ -286,7 +286,7 @@
         // Arrays for Ring Particles
         let pos, vel, acc, E0, energy_perturb, tidal_acc;
 
-        // Intruder State Vectors (Keplerian Orbit designed for fast pericenter passage in ~12 sec)
+        // Intruder State Vectors (Inbound trajectory reaching pericenter in ~10-12s)
         let intruder_pos = new Float32Array([16.0, -8.0, 3.5]);
         let intruder_vel = new Float32Array([-12.5, 14.2, -2.1]);
 
@@ -319,7 +319,6 @@
         }
 
         function initIntruder() {
-            // Hyperbolic/Eccentric Inbound Trajectory starting at 16 AU
             intruder_pos[0] = 16.0;
             intruder_pos[1] = -8.0;
             intruder_pos[2] = 3.5;
@@ -479,7 +478,7 @@
 
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000);
-        camera.position.set(20, 16, 22); // Cinematic elevated perspective angle
+        camera.position.set(18, 14, 20); // Cinematic perspective angle framing BH and TDE stream
 
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true; controls.dampingFactor = 0.05;
@@ -512,21 +511,21 @@
         const starSkybox = new THREE.Points(starGeo, new THREE.PointsMaterial({ size: 1.8, vertexColors: true, transparent: true, opacity: 0.85 }));
         scene.add(starSkybox);
 
-        // 2. BLACK HOLE CENTERPIECE — RELATIVISTIC GRAVITATIONAL LENSING & ACCRETION DISK (100% Matching Reference Image 1)
+        // 2. SCHNITTMAN NASA ACCRETION DISK & LENSING MODEL (100% Matching Reference Images 1 & 2)
         // A. Event Horizon Sphere (Pure Pitch Black)
         const bhGeo = new THREE.SphereGeometry(1.4, 64, 64);
         const bhMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
         const bhMesh = new THREE.Mesh(bhGeo, bhMat);
         scene.add(bhMesh);
 
-        // B. Incandescent Photon Ring (Razor Thin Brilliant Rim)
+        // B. Incandescent Photon Ring (Razor Thin Rim)
         const photonRingGeo = new THREE.RingGeometry(1.41, 1.48, 128);
         const photonRingMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.98 });
         const photonRingMesh = new THREE.Mesh(photonRingGeo, photonRingMat);
         photonRingMesh.rotation.x = Math.PI / 2.0;
         scene.add(photonRingMesh);
 
-        // C. Custom Shader Material for Relativistic Accretion Disk (Doppler Beaming + Concentric Bands + Temperature Colors)
+        // C. Custom GLSL Shader Material for Accretion Disk & Lensing
         const accretionShaderMat = new THREE.ShaderMaterial({
             uniforms: {
                 uTime: { value: 0.0 }
@@ -562,7 +561,7 @@
                     float angle = atan(vLocalPos.y, vLocalPos.x);
 
                     // Concentric Temperature Ringlets + Turbulence
-                    float stripe = sin(r * 5.0 - uTime * 3.0) * 0.5 + 0.5;
+                    float stripe = sin(r * 5.5 - uTime * 3.0) * 0.5 + 0.5;
                     float turb = noise(vec2(r * 2.5, angle * 6.0 + uTime * 0.6));
                     float pattern = stripe * 0.55 + turb * 0.45;
 
@@ -570,7 +569,7 @@
                     float radialAlpha = smoothstep(1.4, 2.2, r) * (1.0 - smoothstep(7.0, 14.0, r));
 
                     // Relativistic Doppler Beaming (Left side boosted bright gold/white, right side dim crimson)
-                    float doppler = clamp(cos(angle + 0.4) * 0.7 + 0.85, 0.3, 2.0);
+                    float doppler = clamp(cos(angle + 0.4) * 0.75 + 0.85, 0.3, 2.0);
 
                     // Temperature Color Gradient
                     float t = clamp((r - 1.5) / 11.0, 0.0, 1.0);
@@ -599,7 +598,7 @@
         accretionDiskMesh.rotation.x = Math.PI / 2.0;
         scene.add(accretionDiskMesh);
 
-        // Relativistic Gravitational Lensing Arches (Upper and Lower warped disk overlays matching Ref Image 1)
+        // Relativistic Gravitational Lensing Arches (Upper and Lower warped disk overlays matching Schnittman model)
         const topLensedArchGeo = new THREE.RingGeometry(1.45, 5.5, 128, 16);
         const topLensedArchMesh = new THREE.Mesh(topLensedArchGeo, accretionShaderMat);
         topLensedArchMesh.position.set(0, 0.2, -0.4);
@@ -612,7 +611,41 @@
         bottomLensedArchMesh.rotation.x = Math.PI / 4.0;
         scene.add(bottomLensedArchMesh);
 
-        // 3. Reference Orbit Ring Outlines (Unperturbed Initial Geometry)
+        // 3. VOLUMETRIC TIDAL DISRUPTION EVENT (TDE) PLASMA STREAM RIBBON (100% Matching NASA Hubble Video Reference Image 3)
+        const tdeStreamPtsCount = 64;
+        const tdeStreamPositions = new Float32Array(tdeStreamPtsCount * 3);
+        const tdeStreamGeo = new THREE.BufferGeometry();
+        tdeStreamGeo.setAttribute('position', new THREE.BufferAttribute(tdeStreamPositions, 3));
+
+        const tdeStreamShaderMat = new THREE.ShaderMaterial({
+            uniforms: { uTime: { value: 0.0 }, uIntensity: { value: 0.0 } },
+            vertexShader: `
+                varying vec3 vPos;
+                void main() {
+                    vPos = position;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform float uTime;
+                uniform float uIntensity;
+                varying vec3 vPos;
+                void main() {
+                    float dist = length(vPos);
+                    vec3 colCore = vec3(1.0, 0.98, 0.90);
+                    vec3 colEdge = vec3(1.0, 0.45, 0.05);
+                    vec3 color = mix(colCore, colEdge, smoothstep(2.0, 8.0, dist));
+                    float alpha = uIntensity * 0.75 * (1.0 - smoothstep(1.5, 12.0, dist));
+                    gl_FragColor = vec4(color, alpha);
+                }
+            `,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            side: THREE.DoubleSide
+        });
+
+        // 4. Reference Orbit Ring Outlines (Unperturbed Initial Geometry)
         const refGroup = new THREE.Group();
         const refRadii = [R_IN, 8.5, 11.0, R_OUT];
         refRadii.forEach(r => {
@@ -627,7 +660,7 @@
         scene.add(refGroup);
         refGroup.visible = false;
 
-        // 4. Luminous Stellar Intruder with Plasma Glow
+        // 5. Luminous Stellar Intruder with Plasma Glow
         const intruderGeo = new THREE.SphereGeometry(0.7, 32, 32);
         const intruderMat = new THREE.MeshBasicMaterial({ color: 0xffbb33 });
         const intruderMesh = new THREE.Mesh(intruderGeo, intruderMat);
@@ -647,7 +680,7 @@
         const trailLine = new THREE.Line(trailGeo, trailMat);
         scene.add(trailLine);
 
-        // 5. 3D Sparse Differential Acceleration Vector Field Overlay
+        // 6. 3D Sparse Differential Acceleration Vector Field Overlay
         const tidalFieldGridSize = 7;
         const tidalVectorLinesCount = tidalFieldGridSize * tidalFieldGridSize;
         const tidalFieldPositions = new Float32Array(tidalVectorLinesCount * 6);
@@ -697,7 +730,7 @@
             tidalFieldGeo.attributes.position.needsUpdate = true;
         }
 
-        // 6. High-Density Particle System Shader with Dynamic Size Scaling & Additive Blending
+        // 7. High-Density Particle System Shader with Dynamic Size Scaling & Additive Blending
         let particleGeo = new THREE.BufferGeometry();
         let particleColors = new Float32Array(N * 3);
         let particleDevs = new Float32Array(N);
@@ -829,6 +862,9 @@
             if (alertBanner) {
                 alertBanner.style.display = (dist <= 8.5) ? 'block' : 'none';
             }
+
+            // Volumetric TDE Stream Ribbon Intensity
+            tdeStreamShaderMat.uniforms.uIntensity.value = Math.min(1.0, perturbedRatio * 3.5);
         }
 
         // Live Analytics Canvas
@@ -869,7 +905,7 @@
             logConsole(`Test 5 (Tidal Field Scaling): PASSED (Differential Force ~ r^-3)`, true);
         }
 
-        initRing(10000);
+        initRing(15000);
 
         // Main Simulation Render Loop
         function animate() {
@@ -884,6 +920,7 @@
             starSkybox.rotation.y += 0.0001;
             photonRingMesh.rotation.z += 0.002;
             accretionShaderMat.uniforms.uTime.value += 0.015;
+            tdeStreamShaderMat.uniforms.uTime.value += 0.015;
 
             let dist = Math.hypot(intruder_pos[0], intruder_pos[1], intruder_pos[2]);
             document.getElementById('val-time').textContent = `${sim_time.toFixed(2)} yr`;
@@ -953,7 +990,7 @@
             } else if (e.code === 'KeyS' || e.code === 'ArrowDown') {
                 sim_speed = Math.max(0.1, sim_speed - 0.5);
             } else if (e.code === 'Escape') {
-                camera.position.set(20, 16, 22);
+                camera.position.set(18, 14, 20);
                 controls.target.set(0, 0, 0);
             }
         });
