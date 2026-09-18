@@ -23,10 +23,21 @@ import numpy as np
 from phaethon.physics import G_CONST
 from phaethon.simulation import SimulationApp
 
+class NoCacheHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
+    """Custom HTTP Request Handler adding strict no-cache headers to prevent browser asset caching."""
+    def end_headers(self):
+        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        self.send_header('Pragma', 'no-cache')
+        self.send_header('Expires', '0')
+        super().end_headers()
+
 def start_web_server(port: int = 8000):
     web_dir = os.path.join(os.path.dirname(__file__), "web")
     os.chdir(web_dir)
-    handler = http.server.SimpleHTTPRequestHandler
+    handler = NoCacheHTTPRequestHandler
+    
+    # Allow port reuse to prevent WinError 10048 when restarting quickly
+    socketserver.TCPServer.allow_reuse_address = True
     httpd = socketserver.TCPServer(("", port), handler)
     print("=" * 70)
     print(f"PHAETHON WEBGL SERVER: http://localhost:{port}")
