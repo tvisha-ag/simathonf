@@ -660,16 +660,82 @@
         scene.add(refGroup);
         refGroup.visible = false;
 
-        // 5. Luminous Stellar Intruder with Plasma Glow
+        // 5. Procedural Stellar Body (Stellar Convection Surface & Limb Brightening Shader)
+        const stellarShaderMat = new THREE.ShaderMaterial({
+            uniforms: { uTime: { value: 0.0 } },
+            vertexShader: `
+                varying vec3 vNormal;
+                varying vec3 vPosition;
+                void main() {
+                    vNormal = normalize(normalMatrix * normal);
+                    vPosition = position;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform float uTime;
+                varying vec3 vNormal;
+                varying vec3 vPosition;
+
+                float hash(vec3 p) {
+                    return fract(sin(dot(p, vec3(12.9898, 78.233, 45.164))) * 43758.5453);
+                }
+
+                float noise(vec3 p) {
+                    vec3 i = floor(p); vec3 f = fract(p);
+                    float a = hash(i); float b = hash(i + vec3(1.0, 0.0, 0.0));
+                    float c = hash(i + vec3(0.0, 1.0, 0.0)); float d = hash(i + vec3(1.0, 1.0, 0.0));
+                    vec2 u = f.xy * f.xy * (3.0 - 2.0 * f.xy);
+                    return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+                }
+
+                void main() {
+                    vec3 viewDir = vec3(0.0, 0.0, 1.0);
+                    float fresnel = pow(1.0 - abs(dot(vNormal, viewDir)), 2.5);
+                    float gran = noise(vPosition * 8.0 + vec3(uTime * 0.5));
+
+                    vec3 colCore = vec3(1.0, 0.95, 0.70); // Incandescent Yellow-White Core
+                    vec3 colEdge = vec3(1.0, 0.40, 0.05); // Solar Flare Amber-Orange
+                    vec3 colCorona = vec3(1.0, 1.0, 0.95); // White Limb Glow
+
+                    vec3 baseCol = mix(colCore, colEdge, gran * 0.55 + 0.25);
+                    vec3 finalCol = mix(baseCol, colCorona, fresnel * 0.85);
+
+                    gl_FragColor = vec4(finalCol * 1.5, 1.0);
+                }
+            `
+        });
+
         const intruderGeo = new THREE.SphereGeometry(0.7, 32, 32);
-        const intruderMat = new THREE.MeshBasicMaterial({ color: 0xffbb33 });
-        const intruderMesh = new THREE.Mesh(intruderGeo, intruderMat);
+        const intruderMesh = new THREE.Mesh(intruderGeo, stellarShaderMat);
         scene.add(intruderMesh);
 
-        const haloGeo = new THREE.SphereGeometry(1.4, 32, 32);
-        const haloMat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.45 });
-        const haloMesh = new THREE.Mesh(haloGeo, haloMat);
-        intruderMesh.add(haloMesh);
+        // Soft Solar Corona Layer
+        const coronaGeo = new THREE.SphereGeometry(1.6, 32, 32);
+        const coronaShaderMat = new THREE.ShaderMaterial({
+            uniforms: { uTime: { value: 0.0 } },
+            vertexShader: `
+                varying vec3 vNormal;
+                void main() {
+                    vNormal = normalize(normalMatrix * normal);
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform float uTime;
+                varying vec3 vNormal;
+                void main() {
+                    float intensity = pow(0.65 - dot(vNormal, vec3(0, 0, 1.0)), 2.0);
+                    vec3 coronaColor = vec3(1.0, 0.65, 0.15);
+                    gl_FragColor = vec4(coronaColor * 1.8, intensity * 0.65);
+                }
+            `,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            side: THREE.BackSide
+        });
+        const coronaMesh = new THREE.Mesh(coronaGeo, coronaShaderMat);
+        intruderMesh.add(coronaMesh);
 
         // Intruder Trajectory Line
         const trailMaxPts = 200;
@@ -921,6 +987,8 @@
             photonRingMesh.rotation.z += 0.002;
             accretionShaderMat.uniforms.uTime.value += 0.015;
             tdeStreamShaderMat.uniforms.uTime.value += 0.015;
+            stellarShaderMat.uniforms.uTime.value += 0.015;
+            coronaShaderMat.uniforms.uTime.value += 0.015;
 
             let dist = Math.hypot(intruder_pos[0], intruder_pos[1], intruder_pos[2]);
             document.getElementById('val-time').textContent = `${sim_time.toFixed(2)} yr`;
