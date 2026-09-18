@@ -1,7 +1,8 @@
 # Phaethon: Relativistic Tidal Ring Disruption & Spacetime Engine
-**Simathon Competition Edition — NASA/JPL Observatory Refinement**
+**Simathon Competition Edition — NASA APOD / SVS Cinematic Overhaul**
 
 [![Physics Tests](https://img.shields.io/badge/Physics_Suite-9%2F9_Passed-00f0ff.svg)](#verification-suite)
+[![Visual References](https://img.shields.io/badge/Visual_References-NASA_APOD_|_SVS-ffd700.svg)](#cinematic-rendering)
 [![License](https://img.shields.io/badge/License-MIT-gold.svg)](#license)
 
 ---
@@ -10,7 +11,7 @@
 
 **Phaethon** is an interactive, physically defensible WebGL and Python astrophysics simulation built for scientific visualization and creative coding competitions.
 
-Designed as a **NASA/JPL Mission-Control Computational Observatory**, the simulation models the **tidal disruption of a thin icy particle ring** ($r_{\text{in}} = 5.5\,\text{AU}$, $r_{\text{out}} = 13.5\,\text{AU}$, vertical dispersion $\sigma_z = 0.05\,\text{AU}$) orbiting a Stellar-Mass Central Black Hole ($M_{\text{BH}} = 100\,M_\odot$) when perturbed by an eccentric, inclined Stellar Intruder ($M_{\text{star}} = 25\,M_\odot$).
+Inspired directly by official **NASA APOD, NASA SVS, and Hubble Space Telescope** visualizations, the simulation models the **tidal disruption of a thin icy particle ring** ($r_{\text{in}} = 5.5\,\text{AU}$, $r_{\text{out}} = 13.5\,\text{AU}$, vertical dispersion $\sigma_z = 0.05\,\text{AU}$) orbiting a Stellar-Mass Central Black Hole ($M_{\text{BH}} = 100\,M_\odot$) when perturbed by an eccentric, inclined Stellar Intruder ($M_{\text{star}} = 25\,M_\odot$).
 
 Phaethon calculates differential gravitational forces across $5,000\text{--}20,000$ collisionless test particles using a 2nd-order **Symplectic Velocity Verlet** numerical integrator with optional **1PN Schwarzschild Post-Newtonian relativistic precession**, a live **Reference Orbit Overlay (`V` key)**, and a **3D Tidal Distortion Field** vector overlay.
 
@@ -24,20 +25,22 @@ Phaethon calculates differential gravitational forces across $5,000\text{--}20,0
 
 ---
 
-## 2. Key Refined Observatory Features
+## 2. Cinematic Visual Features (NASA APOD / SVS Inspired)
 
-### A. Thin Disk Ring with 2-3 Radial Ringlets
-- Particles are initialized in a thin, disk-like orbital ring with small vertical dispersion ($\sigma_z = 0.05\,\text{AU}$) and 2-3 clearly visible radial ringlet gaps ($r \approx 7.8\,\text{AU}$ and $r \approx 10.5\,\text{AU}$) preserving circular Keplerian velocities ($v_c = \sqrt{G M / r}$).
+### A. Soft Radial Particle Sprites & Additive Blending
+- Replaces square pixel dots with procedurally generated circular radial soft glow particle textures using `THREE.AdditiveBlending`, rendering luminous plasma points with physical bloom and depth.
 
-### B. Reference Orbit Comparison Mode (`V` Key / Toggle)
-- Toggling `REFERENCE: ON` (`V` key or button) displays thin, elegant unperturbed reference outline loops representing the initial ring boundaries ($r = 5.5, 8.5, 11.0, 13.5\,\text{AU}$), allowing immediate comparison between perturbed particles and pristine orbits.
+### B. NASA APOD Black Hole Event Horizon & Photon Ring
+- Pitch-black central event horizon (`r = 1.4`) encircled by a razor-thin, brilliant photon ring outline (`RingGeometry(1.41, 1.47)`) and a procedurally lensed accretion glow halo (`opacity = 0.35`), directly matching NASA Jeremy Schnittman APOD renders.
 
-### C. 3D Tidal Distortion Field Vector Overlay (`T` Key / Toggle)
-- Toggling `TIDAL FIELD: ON` renders dynamic sparse 3D differential acceleration vectors $\Delta \mathbf{a}_{\text{tidal}} = \mathbf{a}_{\text{star}} - \mathbf{a}_{\text{BH-COM}}$ around the intruder, visually demonstrating *why* differential gravitational forces stretch the ring.
+### C. Procedural B-V Multi-Temperature Deep Space Starfield
+- Renders 3,500 deep-space stars mapped according to real astronomical B-V temperature colors (hot blue O/B stars `#88c8ff`, solar yellow G stars `#fff4cc`, cool red M dwarfs `#ff9977`) with non-uniform magnitude falloff.
 
-### D. Scientifically Accurate Classification
-- Central mass $M_{\text{BH}} = 100\,M_\odot$ is correctly classified as a **Stellar-Mass Black Hole System**.
-- Energy plot is accurately labeled as **Test-Particle Energy Perturbation ($\Delta E / E_0$)**.
+### D. Live Close-Approach Event Alert
+- Dynamic HUD alert banner triggered automatically during intruder pericenter passage: `CLOSE APPROACH DETECTED // TIDAL STREAM IN PROGRESS`.
+
+### E. Elevated 3D Disk Camera Framing ($35^\circ$)
+- Opening camera positioned at ($22, 18, 24$), looking down onto the ring plane to showcase a wide 3D disk structure filling $80\%$ of the viewport.
 
 ---
 
@@ -65,9 +68,9 @@ Particle colors carry direct physical meaning based on orbital energy perturbati
 
 | Perturbation $\text{Dev}_i$ | Color | Physical Meaning |
 |---|---|---|
-| $< 0.05$ | **Cool Cyan** (`#00f0ff`) | Stable / Unperturbed Keplerian Orbit |
+| $< 0.05$ | **Ice Cyan / Blue-White** (`#d0f0ff`) | Stable / Unperturbed Keplerian Orbit |
 | $0.05 \le \text{Dev}_i < 0.20$ | **Stellar Gold** (`#ffd700`) | Moderately Perturbed / Density Wave |
-| $0.20 \le \text{Dev}_i < 0.50$ | **Hot Crimson** (`#ff4500`) | Strongly Perturbed / Tidal Stream |
+| $0.20 \le \text{Dev}_i < 0.50$ | **Incandescent Crimson** (`#ff3010`) | Strongly Perturbed / Tidal Stream |
 | $\ge 0.50$ | **White-Hot Plasma** (`#ffffff`) | High-Energy Escaping Debris |
 
 ---
@@ -125,7 +128,7 @@ tests/test_simulation.py::test_star_catalog_temperature_and_rgb PASSED   [ 77%]
 tests/test_simulation.py::test_simulation_app_lifecycle PASSED           [ 88%]
 tests/test_simulation.py::test_stellar_intruder_trajectory PASSED        [100%]
 
-============================== 9 passed in 1.77s ==============================
+============================== 9 passed in 2.72s ==============================
 ```
 
 ---

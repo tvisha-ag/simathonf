@@ -6,7 +6,7 @@
     <title>PHAETHON // TIDAL RING OBSERVATORY</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background: #02050b; font-family: 'Consolas', 'Fira Code', 'Monaco', monospace; color: #d0e4ff; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #010308; font-family: 'Consolas', 'Fira Code', 'Monaco', monospace; color: #d0e4ff; }
         #webgl-canvas { width: 100%; height: 100%; display: block; }
 
         /* NASA/JPL Observatory Top Header Bar */
@@ -32,12 +32,30 @@
         .header-title { font-size: 16px; font-weight: 900; color: #ffd700; letter-spacing: 2.5px; text-shadow: 0 0 12px rgba(255, 215, 0, 0.35); }
         .header-sub { font-size: 10px; color: #6a88b6; letter-spacing: 1.5px; }
 
-        .header-status { display: flex; align-items: center; gap: 10px; }
+        .header-status { display: flex; align-items: center; gap: 12px; }
         .status-badge {
             font-size: 9.5px; padding: 3px 9px; border-radius: 4px; letter-spacing: 1.2px; font-weight: bold;
             background: rgba(0, 240, 255, 0.15); border: 1px solid #00f0ff; color: #00f0ff;
         }
         .status-badge.paused { background: rgba(255, 215, 0, 0.15); border-color: #ffd700; color: #ffd700; }
+
+        /* Close Approach Event Alert Banner */
+        .alert-banner {
+            display: none;
+            font-size: 9.5px;
+            padding: 3px 10px;
+            background: rgba(255, 48, 80, 0.2);
+            border: 1px solid #ff3050;
+            color: #ff5570;
+            border-radius: 4px;
+            letter-spacing: 1px;
+            font-weight: bold;
+            animation: pulse-alert 1.2s infinite alternate;
+        }
+        @keyframes pulse-alert {
+            0% { opacity: 0.6; box-shadow: 0 0 4px rgba(255, 48, 80, 0.3); }
+            100% { opacity: 1.0; box-shadow: 0 0 14px rgba(255, 48, 80, 0.8); }
+        }
 
         /* 5-Stage Encounter Timeline Bar */
         .timeline-bar {
@@ -157,6 +175,7 @@
         </div>
 
         <div class="header-status">
+            <div class="alert-banner" id="alert-banner">CLOSE APPROACH DETECTED // TIDAL STREAM IN PROGRESS</div>
             <div class="status-badge" id="status-badge">SIMULATION ACTIVE</div>
         </div>
     </div>
@@ -273,6 +292,23 @@
 
         let energy_history = [];
 
+        // Procedural Soft Circular Particle Texture Generator
+        function createParticleTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+            grad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+            grad.addColorStop(0.3, 'rgba(255, 255, 255, 0.85)');
+            grad.addColorStop(0.65, 'rgba(255, 255, 255, 0.25)');
+            grad.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 64, 64);
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        const particleTexture = createParticleTexture();
+
         function logConsole(msg, isSuccess = true) {
             const el = document.getElementById('test-console');
             if (!el) return;
@@ -283,7 +319,7 @@
         }
 
         function initIntruder() {
-            let pericenter = 3.5; // Tuned for rapid, high-impact flyby encounter
+            let pericenter = 3.5; // Pericenter passage producing rapid tidal stream
             let ecc = 0.85;
             let inc = 22.0 * Math.PI / 180.0;
             let a = pericenter / (1.0 - ecc);
@@ -303,7 +339,7 @@
             intruder_vel[2] = vy0 * sin_i;
         }
 
-        // Thin Disk Particle Distribution with 2-3 Radial Ringlets
+        // Thin Disk Particle Distribution with Radial Ringlets
         function initRing(num) {
             N = num;
             pos = new Float32Array(N * 3);
@@ -317,7 +353,6 @@
                 let u = Math.random();
                 let r = R_IN + (R_OUT - R_IN) * Math.sqrt(u);
 
-                // Create 2-3 clearly visible radial ringlet gaps
                 if (r > 7.5 && r < 8.2) {
                     r += (Math.random() < 0.5 ? -0.7 : 0.7);
                 } else if (r > 10.2 && r < 10.8) {
@@ -325,14 +360,12 @@
                 }
 
                 let angle = Math.random() * 2.0 * Math.PI;
-                // Thin disk vertical Gaussian dispersion
                 let z = (Math.random() - 0.5) * 2.0 * THICKNESS;
 
                 pos[i*3] = r * Math.cos(angle);
                 pos[i*3+1] = r * Math.sin(angle);
                 pos[i*3+2] = z;
 
-                // Circular Keplerian orbital speed v = sqrt(G M / r)
                 let v_circ = Math.sqrt(G * M_BH / r);
                 vel[i*3] = -v_circ * Math.sin(angle);
                 vel[i*3+1] = v_circ * Math.cos(angle);
@@ -448,22 +481,22 @@
             sim_time += step_dt;
         }
 
-        // Three.js Render Pipeline & Observatory Setup
+        // Three.js Render Pipeline & NASA Observatory Setup
         const canvas = document.getElementById('webgl-canvas');
-        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000);
-        camera.position.set(26, 16, 26);
+        camera.position.set(22, 18, 24); // Elevated 35-degree disk angle
 
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true; controls.dampingFactor = 0.05;
 
-        // 1. Yale Bright Star Catalog Skybox
+        // 1. Deep Space B-V Temperature-Colored Starfield (3,500 Stars)
         const starGeo = new THREE.BufferGeometry();
-        const starCount = 3000;
+        const starCount = 3500;
         const starPos = new Float32Array(starCount * 3);
         const starColors = new Float32Array(starCount * 3);
 
@@ -475,32 +508,41 @@
             starPos[i*3+1] = r * Math.sin(dec);
             starPos[i*3+2] = r * Math.cos(dec) * Math.sin(ra);
 
-            let temp = 3000 + Math.random() * 10000;
+            let temp = 3000 + Math.random() * 12000;
             let c = new THREE.Color();
-            if (temp < 4000) c.setHSL(0.05, 0.9, 0.6);
-            else if (temp < 6000) c.setHSL(0.12, 0.7, 0.8);
-            else c.setHSL(0.60, 0.85, 0.9);
+            if (temp > 10000) c.setHex(0x88c8ff);      // Hot O/B Blue-White Star
+            else if (temp > 7500) c.setHex(0xe0f0ff);  // White A/F Star
+            else if (temp > 5500) c.setHex(0xfff4cc);  // Solar Yellow G Star
+            else c.setHex(0xff9977);                  // Cool Red M Dwarf
 
             starColors[i*3] = c.r; starColors[i*3+1] = c.g; starColors[i*3+2] = c.b;
         }
         starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
         starGeo.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
-        const starSkybox = new THREE.Points(starGeo, new THREE.PointsMaterial({ size: 2.8, vertexColors: true, transparent: true, opacity: 0.9 }));
+        const starSkybox = new THREE.Points(starGeo, new THREE.PointsMaterial({ size: 2.2, vertexColors: true, transparent: true, opacity: 0.85 }));
         scene.add(starSkybox);
 
-        // 2. Central Black Hole with Photon Ring Rim Glow
-        const bhGeo = new THREE.SphereGeometry(1.2, 48, 48);
+        // 2. NASA APOD Black Hole Event Horizon & Razor-Thin Photon Ring (Matching Ref Images 2 & 3)
+        const bhGeo = new THREE.SphereGeometry(1.4, 64, 64);
         const bhMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
         const bhMesh = new THREE.Mesh(bhGeo, bhMat);
         scene.add(bhMesh);
 
-        const photonRingGeo = new THREE.RingGeometry(1.22, 1.65, 64);
-        const photonRingMat = new THREE.MeshBasicMaterial({ color: 0xffa500, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
+        // Razor-Thin Brilliant Photon Ring Outline
+        const photonRingGeo = new THREE.RingGeometry(1.41, 1.47, 128);
+        const photonRingMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.95 });
         const photonRingMesh = new THREE.Mesh(photonRingGeo, photonRingMat);
         photonRingMesh.rotation.x = Math.PI / 2.0;
         scene.add(photonRingMesh);
 
-        // 3. Feature: Reference Orbit Ring Outlines (Unperturbed Initial Configuration)
+        // Accretion Gravitational Lensing Halo
+        const lensingHaloGeo = new THREE.RingGeometry(1.48, 3.2, 96);
+        const lensingHaloMat = new THREE.MeshBasicMaterial({ color: 0xff8c00, side: THREE.DoubleSide, transparent: true, opacity: 0.35 });
+        const lensingHaloMesh = new THREE.Mesh(lensingHaloGeo, lensingHaloMat);
+        lensingHaloMesh.rotation.x = Math.PI / 2.0;
+        scene.add(lensingHaloMesh);
+
+        // 3. Reference Orbit Ring Outlines (Unperturbed Initial Geometry)
         const refGroup = new THREE.Group();
         const refRadii = [R_IN, 8.5, 11.0, R_OUT];
         refRadii.forEach(r => {
@@ -515,18 +557,18 @@
         scene.add(refGroup);
         refGroup.visible = false;
 
-        // 4. Stellar Intruder Object with Glow
+        // 4. Luminous Stellar Intruder with Plasma Glow
         const intruderGeo = new THREE.SphereGeometry(0.7, 32, 32);
-        const intruderMat = new THREE.MeshBasicMaterial({ color: 0xffaa22 });
+        const intruderMat = new THREE.MeshBasicMaterial({ color: 0xffbb33 });
         const intruderMesh = new THREE.Mesh(intruderGeo, intruderMat);
         scene.add(intruderMesh);
 
-        const haloGeo = new THREE.SphereGeometry(1.2, 32, 32);
-        const haloMat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.35 });
+        const haloGeo = new THREE.SphereGeometry(1.3, 32, 32);
+        const haloMat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.4 });
         const haloMesh = new THREE.Mesh(haloGeo, haloMat);
         intruderMesh.add(haloMesh);
 
-        // Intruder Trajectory Trail
+        // Intruder Trajectory Line
         const trailMaxPts = 200;
         const trailPositions = new Float32Array(trailMaxPts * 3);
         const trailGeo = new THREE.BufferGeometry();
@@ -535,13 +577,13 @@
         const trailLine = new THREE.Line(trailGeo, trailMat);
         scene.add(trailLine);
 
-        // 5. 3D Sparse Tidal Distortion Vector Field Overlay
+        // 5. 3D Sparse Differential Acceleration Vector Field Overlay
         const tidalFieldGridSize = 7;
         const tidalVectorLinesCount = tidalFieldGridSize * tidalFieldGridSize;
         const tidalFieldPositions = new Float32Array(tidalVectorLinesCount * 6);
         const tidalFieldGeo = new THREE.BufferGeometry();
         tidalFieldGeo.setAttribute('position', new THREE.BufferAttribute(tidalFieldPositions, 3));
-        const tidalFieldMat = new THREE.LineBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.6, linewidth: 1.5 });
+        const tidalFieldMat = new THREE.LineBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.65, linewidth: 1.5 });
         const tidalFieldMesh = new THREE.LineSegments(tidalFieldGeo, tidalFieldMat);
         scene.add(tidalFieldMesh);
         tidalFieldMesh.visible = false;
@@ -585,17 +627,20 @@
             tidalFieldGeo.attributes.position.needsUpdate = true;
         }
 
-        // 6. Thin Ring Particle System Points Field
+        // 6. Soft Radial Glow Particle System (Additive Blending for Luminous Plasma Points)
         let particleGeo = new THREE.BufferGeometry();
         let particleColors = new Float32Array(N * 3);
         particleGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
         particleGeo.setAttribute('color', new THREE.BufferAttribute(particleColors, 3));
 
         const particleMat = new THREE.PointsMaterial({
-            size: 0.30,
+            size: 0.55,
+            map: particleTexture,
             vertexColors: true,
             transparent: true,
-            opacity: 0.90,
+            opacity: 0.95,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
             sizeAttenuation: true
         });
         let particleSystem = new THREE.Points(particleGeo, particleMat);
@@ -624,12 +669,16 @@
                 let r = 0, g = 0, b = 0;
 
                 if (dev < 0.05) {
-                    r = 0.0; g = 0.94; b = 1.0;
+                    // Cool Ice Cyan / Blue-White
+                    r = 0.82; g = 0.95; b = 1.0;
                 } else if (dev < 0.20) {
+                    // Stellar Gold / Amber
                     r = 1.0; g = 0.84; b = 0.0;
                 } else if (dev < 0.50) {
-                    r = 1.0; g = 0.27; b = 0.0;
+                    // Incandescent Crimson / Red-Orange
+                    r = 1.0; g = 0.20; b = 0.05;
                 } else {
+                    // White-Hot Plasma Stream
                     r = 1.0; g = 1.0; b = 1.0;
                 }
 
@@ -671,6 +720,12 @@
             for (let s = 1; s <= 5; s++) {
                 let el = document.getElementById(`stage-${s}`);
                 if (el) el.classList.toggle('active', s === stage);
+            }
+
+            // Close approach alert banner trigger
+            const alertBanner = document.getElementById('alert-banner');
+            if (alertBanner) {
+                alertBanner.style.display = (dist <= 9.0) ? 'block' : 'none';
             }
         }
 
@@ -726,6 +781,7 @@
             intruderMesh.position.set(intruder_pos[0], intruder_pos[1], intruder_pos[2]);
             starSkybox.rotation.y += 0.0001;
             photonRingMesh.rotation.z += 0.002;
+            lensingHaloMesh.rotation.z -= 0.001;
 
             let dist = Math.hypot(intruder_pos[0], intruder_pos[1], intruder_pos[2]);
             document.getElementById('val-time').textContent = `${sim_time.toFixed(2)} yr`;
@@ -795,7 +851,7 @@
             } else if (e.code === 'KeyS' || e.code === 'ArrowDown') {
                 sim_speed = Math.max(0.1, sim_speed - 0.5);
             } else if (e.code === 'Escape') {
-                camera.position.set(26, 16, 26);
+                camera.position.set(22, 18, 24);
                 controls.target.set(0, 0, 0);
             }
         });
